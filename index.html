@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>No Sleep Page</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: #333;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .gradient-background {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: radial-gradient(circle at center, #8ec5fc, #e0c3fc);
+            background-size: 200% 200%;
+            animation: pulse 15s ease infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                background-size: 100% 100%;
+                background-position: center center;
+            }
+
+            50% {
+                background-size: 200% 200%;
+                background-position: center center;
+            }
+
+            100% {
+                background-size: 100% 100%;
+                background-position: center center;
+            }
+        }
+
+        .container {
+            text-align: center;
+            padding: 2rem;
+            background-color: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(5px);
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            max-width: 500px;
+            width: 90%;
+        }
+
+        h1 {
+            margin-top: 0;
+            color: #2c3e50;
+            font-size: 2rem;
+        }
+
+        .status {
+            margin: 1.5rem 0;
+            padding: 1rem;
+            background-color: #e8f5e9;
+            border-radius: 8px;
+            font-weight: bold;
+            color: #2e7d32;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        }
+
+        .timer {
+            font-size: 1.2rem;
+            margin: 1.5rem 0;
+            font-weight: 500;
+        }
+
+        .footer {
+            margin-top: 2rem;
+            font-size: 0.9rem;
+            color: #7f8c8d;
+            padding-top: 1rem;
+            border-top: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .details-toggle {
+            margin-top: 1.5rem;
+            background: none;
+            border: none;
+            color: #3498db;
+            cursor: pointer;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            transition: all 0.2s ease;
+            padding: 8px;
+            border-radius: 4px;
+        }
+
+        .details-toggle:hover {
+            background-color: rgba(52, 152, 219, 0.1);
+            color: #2980b9;
+        }
+
+        .details-toggle::after {
+            content: "▼";
+            margin-left: 5px;
+            font-size: 0.7rem;
+            transition: transform 0.2s ease;
+        }
+
+        .details-toggle.open::after {
+            transform: rotate(180deg);
+        }
+
+        .technical-details {
+            display: none;
+            margin-top: 1rem;
+            padding: 1rem;
+            background-color: rgba(240, 240, 240, 0.8);
+            border-radius: 8px;
+            text-align: left;
+        }
+
+        .technical-details.visible {
+            display: block;
+        }
+
+        .interval-control {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 1rem 0;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        input {
+            padding: 8px;
+            width: 60px;
+            text-align: center;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        button {
+            padding: 8px 16px;
+            background-color: #2c3e50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        button:hover {
+            background-color: #3a506b;
+        }
+
+        .next-execution {
+            font-size: 0.9rem;
+            margin: 0.5rem 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="gradient-background"></div>
+    <div class="container">
+        <h1>No Sleep</h1>
+        <p>This page will prevent your computer from going to sleep as long as it remains open in your browser.</p>
+
+        <div class="status">
+            ✓ ACTIVE - Your computer will stay awake
+        </div>
+
+        <div class="timer">
+            Running for: <span id="time">00:00:00</span>
+        </div>
+
+        <p>Simply keep this tab open to prevent sleep mode. Close it when you want to allow normal sleep behavior.</p>
+
+        <button class="details-toggle" id="details-toggle">Technical Details</button>
+
+        <div class="technical-details" id="technical-details">
+            <p>The page runs a small function periodically to keep your computer awake:</p>
+
+            <div class="interval-control">
+                <label for="interval">Wake function interval:</label>
+                <input type="number" id="interval" min="5" max="300" value="30"> seconds
+                <button id="update-interval">Update</button>
+            </div>
+
+            <div class="next-execution">
+                Next wake function in: <span id="countdown">30</span> seconds
+            </div>
+
+            <p><strong>How it works:</strong> The page performs small actions at the interval above to signal activity
+                to your operating system, preventing sleep mode.</p>
+        </div>
+
+        <div class="footer">
+            Keep this tab open to prevent your system from sleeping.
+        </div>
+    </div>
+
+    <script>
+        let wakeInterval = 30000; // Default 30 seconds
+        let countdownTimer;
+        let wakeTimer;
+
+        // Function to prevent sleep by performing a minimal operation
+        function preventSleep() {
+            // Create a small, invisible canvas element and get its context
+            const canvas = document.createElement('canvas');
+            canvas.width = 1;
+            canvas.height = 1;
+            const ctx = canvas.getContext('2d');
+
+            // Draw a tiny dot on the canvas (minimal GPU/CPU activity)
+            if (ctx) {
+                ctx.fillStyle = 'rgba(0,0,0,0.01)';
+                ctx.fillRect(0, 0, 1, 1);
+            }
+
+            // Force a minimal DOM reflow
+            document.body.classList.toggle('active-no-sleep');
+            document.body.classList.toggle('active-no-sleep');
+
+            // Reset countdown
+            resetCountdown();
+        }
+
+        // Timer function to display running time
+        function updateTimer() {
+            const timerElement = document.getElementById('time');
+            let seconds = 0;
+            let minutes = 0;
+            let hours = 0;
+
+            setInterval(() => {
+                seconds++;
+                if (seconds >= 60) {
+                    seconds = 0;
+                    minutes++;
+                    if (minutes >= 60) {
+                        minutes = 0;
+                        hours++;
+                    }
+                }
+
+                const displayHours = hours.toString().padStart(2, '0');
+                const displayMinutes = minutes.toString().padStart(2, '0');
+                const displaySeconds = seconds.toString().padStart(2, '0');
+
+                timerElement.textContent = `${displayHours}:${displayMinutes}:${displaySeconds}`;
+            }, 1000);
+        }
+
+        // Function to update the countdown timer
+        function updateCountdown() {
+            const countdownElement = document.getElementById('countdown');
+            let secondsLeft = Math.floor(wakeInterval / 1000);
+
+            clearInterval(countdownTimer);
+
+            countdownTimer = setInterval(() => {
+                secondsLeft--;
+                countdownElement.textContent = secondsLeft;
+
+                if (secondsLeft <= 0) {
+                    secondsLeft = Math.floor(wakeInterval / 1000);
+                }
+            }, 1000);
+        }
+
+        // Function to reset the countdown timer
+        function resetCountdown() {
+            const countdownElement = document.getElementById('countdown');
+            let secondsLeft = Math.floor(wakeInterval / 1000);
+            countdownElement.textContent = secondsLeft;
+        }
+
+        // Function to update the wake interval
+        function updateWakeInterval() {
+            const intervalInput = document.getElementById('interval');
+            const newInterval = parseInt(intervalInput.value);
+
+            // Validate input
+            if (newInterval >= 5 && newInterval <= 300) {
+                wakeInterval = newInterval * 1000;
+
+                // Clear existing timers
+                clearInterval(wakeTimer);
+                clearInterval(countdownTimer);
+
+                // Set new timer
+                wakeTimer = setInterval(preventSleep, wakeInterval);
+
+                // Reset countdown
+                resetCountdown();
+                updateCountdown();
+            } else {
+                alert('Please enter a value between 5 and 300 seconds.');
+                intervalInput.value = Math.floor(wakeInterval / 1000);
+            }
+        }
+
+        // Toggle technical details section
+        function toggleDetails() {
+            const detailsSection = document.getElementById('technical-details');
+            const toggleButton = document.getElementById('details-toggle');
+
+            detailsSection.classList.toggle('visible');
+            toggleButton.classList.toggle('open');
+        }
+
+        // Set up event listeners
+        document.getElementById('update-interval').addEventListener('click', updateWakeInterval);
+        document.getElementById('details-toggle').addEventListener('click', toggleDetails);
+
+        // Initialize the page
+        function initialize() {
+            // Set initial interval value
+            document.getElementById('interval').value = Math.floor(wakeInterval / 1000);
+
+            // Start the wake timer
+            wakeTimer = setInterval(preventSleep, wakeInterval);
+
+            // Start the countdown
+            updateCountdown();
+
+            // Start the running timer
+            updateTimer();
+
+            // Initial call to prevent sleep
+            preventSleep();
+        }
+
+        // Initialize everything when the page loads
+        window.onload = initialize;
+    </script>
+</body>
+
+</html>
