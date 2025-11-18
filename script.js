@@ -1,3 +1,5 @@
+const BUILD_TIMESTAMP = 'BUILD_TIMESTAMP_PLACEHOLDER';
+
 let wakeInterval = 30000;
 let countdownTimer;
 let wakeTimer;
@@ -112,6 +114,9 @@ function toggleDetails() {
 }
 
 function initialize() {
+    console.log(`%cNo Sleep App`, 'font-size: 16px; font-weight: bold; color: #2c3e50;');
+    console.log(`Last updated: ${BUILD_TIMESTAMP}`);
+
     const intervalInput = document.getElementById('interval');
     const updateButton = document.getElementById('update-interval');
     const toggleButton = document.getElementById('details-toggle');
