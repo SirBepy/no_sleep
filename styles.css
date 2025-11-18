@@ -161,3 +161,13 @@ button:hover {
     font-size: 0.9rem;
     margin: 0.5rem 0;
 }
+
+.error-message {
+    display: none;
+    color: #d32f2f;
+    font-size: 0.85rem;
+    margin: 0.5rem 0;
+    padding: 0.5rem;
+    background-color: rgba(211, 47, 47, 0.1);
+    border-radius: 4px;
+}
