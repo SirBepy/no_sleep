@@ -5,21 +5,53 @@ let countdownTimer;
 let wakeTimer;
 let runningTimer;
 let startTime;
+let wakeLock = null;
+let wakeLockSupported = false;
+
+async function requestWakeLock() {
+    if (!wakeLockSupported) return false;
+
+    try {
+        wakeLock = await navigator.wakeLock.request('screen');
+
+        wakeLock.addEventListener('release', () => {
+            console.log('Wake Lock released');
+        });
+
+        console.log('Wake Lock active');
+        updateStatus(true);
+        return true;
+    } catch (err) {
+        console.error('Wake Lock request failed:', err);
+        updateStatus(false);
+        return false;
+    }
+}
+
+async function releaseWakeLock() {
+    if (wakeLock) {
+        await wakeLock.release();
+        wakeLock = null;
+    }
+}
+
+function updateStatus(isActive) {
+    const statusElement = document.querySelector('.status');
+    if (!statusElement) return;
+
+    if (isActive) {
+        statusElement.textContent = '✓ ACTIVE - Your computer will stay awake';
+        statusElement.style.backgroundColor = '#e8f5e9';
+        statusElement.style.color = '#2e7d32';
+    } else {
+        statusElement.textContent = '⚠ INACTIVE - Click to enable wake lock';
+        statusElement.style.backgroundColor = '#fff3e0';
+        statusElement.style.color = '#f57c00';
+        statusElement.style.cursor = 'pointer';
+    }
+}
 
 function preventSleep() {
-    const canvas = document.createElement('canvas');
-    canvas.width = 1;
-    canvas.height = 1;
-    const ctx = canvas.getContext('2d');
-
-    if (ctx) {
-        ctx.fillStyle = 'rgba(0,0,0,0.01)';
-        ctx.fillRect(0, 0, 1, 1);
-    }
-
-    document.body.classList.toggle('active-no-sleep');
-    document.body.classList.toggle('active-no-sleep');
-
     resetCountdown();
 }
 
@@ -113,13 +145,23 @@ function toggleDetails() {
     toggleButton.classList.toggle('open');
 }
 
-function initialize() {
+async function initialize() {
     console.log(`%cNo Sleep App`, 'font-size: 16px; font-weight: bold; color: #2c3e50;');
     console.log(`Last updated: ${BUILD_TIMESTAMP}`);
+
+    wakeLockSupported = 'wakeLock' in navigator;
+
+    if (wakeLockSupported) {
+        console.log('Wake Lock API supported');
+    } else {
+        console.warn('Wake Lock API not supported in this browser');
+        updateStatus(false);
+    }
 
     const intervalInput = document.getElementById('interval');
     const updateButton = document.getElementById('update-interval');
     const toggleButton = document.getElementById('details-toggle');
+    const statusElement = document.querySelector('.status');
 
     if (intervalInput) {
         intervalInput.value = Math.floor(wakeInterval / 1000);
@@ -133,12 +175,28 @@ function initialize() {
         toggleButton.addEventListener('click', toggleDetails);
     }
 
+    if (statusElement) {
+        statusElement.addEventListener('click', async () => {
+            if (!wakeLock) {
+                await requestWakeLock();
+            }
+        });
+    }
+
+    document.addEventListener('visibilitychange', async () => {
+        if (document.visibilityState === 'visible' && wakeLockSupported) {
+            await requestWakeLock();
+        }
+    });
+
     startTime = Date.now();
 
     wakeTimer = setInterval(preventSleep, wakeInterval);
     updateCountdown();
     updateTimer();
     preventSleep();
+
+    await requestWakeLock();
 }
 
 window.onload = initialize;
