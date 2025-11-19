@@ -49,6 +49,7 @@ body {
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
     max-width: 500px;
     width: 90%;
+    position: relative;
 }
 
 h1 {
@@ -57,14 +58,53 @@ h1 {
     font-size: 2rem;
 }
 
-.status {
-    margin: 1.5rem 0;
+.info-button {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    cursor: pointer;
+    color: #7f8c8d;
+    transition: color 0.2s ease;
+    z-index: 10;
+}
+
+.info-button:hover {
+    color: #2c3e50;
+}
+
+.info-button:hover .info-tooltip {
+    opacity: 1;
+    visibility: visible;
+}
+
+.info-tooltip {
+    position: absolute;
+    top: 30px;
+    right: 0;
+    background-color: rgba(44, 62, 80, 0.95);
+    color: white;
     padding: 1rem;
-    background-color: #e8f5e9;
     border-radius: 8px;
-    font-weight: bold;
-    color: #2e7d32;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+    width: 250px;
+    text-align: left;
+    font-size: 0.85rem;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+    pointer-events: none;
+}
+
+.info-tooltip p {
+    margin: 0.5rem 0;
+}
+
+.info-tooltip p:first-child {
+    margin-top: 0;
+}
+
+.info-tooltip p:last-child {
+    margin-bottom: 0;
 }
 
 .timer {
@@ -74,11 +114,20 @@ h1 {
 }
 
 .footer {
-    margin-top: 2rem;
-    font-size: 0.9rem;
-    color: #7f8c8d;
-    padding-top: 1rem;
-    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    position: fixed;
+    bottom: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.75rem;
+    color: rgba(127, 140, 141, 0.4);
+    text-align: center;
+    opacity: 0.6;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+}
+
+.footer:hover {
+    opacity: 0.9;
 }
 
 .details-toggle {

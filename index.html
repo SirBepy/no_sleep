@@ -12,18 +12,24 @@
 <body>
     <div class="gradient-background"></div>
     <div class="container">
-        <h1>No Sleep</h1>
-        <p>This page will prevent your computer from going to sleep as long as it remains open in your browser.</p>
-
-        <div class="status">
-            ✓ ACTIVE - Your computer will stay awake
+        <div class="info-button" id="info-button">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="16" x2="12" y2="12"></line>
+                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            <div class="info-tooltip">
+                <p><strong>How to use:</strong></p>
+                <p>This page will prevent your computer from going to sleep as long as it remains open in your browser.</p>
+                <p>Simply keep this tab open to prevent sleep mode. Close it when you want to allow normal sleep behavior.</p>
+            </div>
         </div>
+
+        <h1>No Sleep</h1>
 
         <div class="timer">
             Running for: <span id="time">00:00:00</span>
         </div>
-
-        <p>Simply keep this tab open to prevent sleep mode. Close it when you want to allow normal sleep behavior.</p>
 
         <button class="details-toggle" id="details-toggle">Technical Details</button>
 
@@ -45,10 +51,10 @@
             <p><strong>How it works:</strong> The page performs small actions at the interval above to signal activity
                 to your operating system, preventing sleep mode.</p>
         </div>
+    </div>
 
-        <div class="footer">
-            Keep this tab open to prevent your system from sleeping.
-        </div>
+    <div class="footer">
+        Keep this tab open to prevent your system from sleeping.
     </div>
 
     <script src="script.js"></script>
