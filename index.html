@@ -10,7 +10,7 @@
 </head>
 
 <body>
-    <div class="gradient-background"></div>
+    <div class="force-behind gradient-background"></div>
     <div class="container">
         <div class="info-button" id="info-button">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -20,21 +20,27 @@
             </svg>
             <div class="info-tooltip">
                 <p><strong>How to use:</strong></p>
-                <p>This page will prevent your computer from going to sleep as long as it remains open in your browser.</p>
-                <p>Simply keep this tab open to prevent sleep mode. Close it when you want to allow normal sleep behavior.</p>
+                <p>This page will prevent your computer from going to sleep as long as it remains open in your browser.
+                </p>
+                <p>Simply keep this tab open to prevent sleep mode. Close it when you want to allow normal sleep
+                    behavior.</p>
             </div>
         </div>
 
         <h1>No Sleep</h1>
 
         <div class="timer">
-            Running for: <span id="time">00:00:00</span>
+            <span class="running-for">Running for:</span> <br /><span id="time">00:00:00</span>
         </div>
 
-        <button class="details-toggle" id="details-toggle">Technical Details</button>
+        <button class="details-toggle" id="details-toggle">More</button>
 
-        <div class="technical-details" id="technical-details">
+        <div class="technical-details gradient-background" id="technical-details">
             <p>The page runs a small function periodically to keep your computer awake:</p>
+
+            <div class="next-execution">
+                Next wakeup function in: <span id="countdown">30</span> seconds
+            </div>
 
             <div class="interval-control">
                 <label for="interval">Wake function interval:</label>
@@ -43,13 +49,6 @@
             </div>
 
             <div id="interval-error" class="error-message"></div>
-
-            <div class="next-execution">
-                Next wake function in: <span id="countdown">30</span> seconds
-            </div>
-
-            <p><strong>How it works:</strong> The page performs small actions at the interval above to signal activity
-                to your operating system, preventing sleep mode.</p>
         </div>
     </div>
 
