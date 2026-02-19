@@ -5,6 +5,8 @@ let countdownTimer;
 let wakeTimer;
 let runningTimer;
 let startTime;
+let elapsedMs = 0;
+let isPaused = false;
 let wakeLock = null;
 let wakeLockSupported = false;
 
@@ -55,24 +57,45 @@ function preventSleep() {
     resetCountdown();
 }
 
-function updateTimer() {
+function renderTimer() {
     const timerElement = document.getElementById('time');
     if (!timerElement) return;
 
-    runningTimer = setInterval(() => {
-        const elapsed = Date.now() - startTime;
-        const totalSeconds = Math.floor(elapsed / 1000);
+    const current = elapsedMs + Date.now() - startTime;
+    sessionStorage.setItem('nosleep_elapsed', current);
 
-        const hours = Math.floor(totalSeconds / 3600);
-        const minutes = Math.floor((totalSeconds % 3600) / 60);
-        const seconds = totalSeconds % 60;
+    const totalSeconds = Math.floor(current / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
 
-        const displayHours = hours.toString().padStart(2, '0');
-        const displayMinutes = minutes.toString().padStart(2, '0');
-        const displaySeconds = seconds.toString().padStart(2, '0');
+    timerElement.textContent = [hours, minutes, seconds]
+        .map(n => n.toString().padStart(2, '0'))
+        .join(':');
+}
 
-        timerElement.textContent = `${displayHours}:${displayMinutes}:${displaySeconds}`;
-    }, 1000);
+function updateTimer() {
+    renderTimer();
+    runningTimer = setInterval(renderTimer, 1000);
+}
+
+function togglePause() {
+    const pauseButton = document.getElementById('pause-toggle');
+    if (!pauseButton) return;
+
+    isPaused = !isPaused;
+
+    if (isPaused) {
+        elapsedMs += Date.now() - startTime;
+        clearInterval(runningTimer);
+        pauseButton.querySelector('span').textContent = 'Resume';
+        pauseButton.classList.add('paused');
+    } else {
+        startTime = Date.now();
+        updateTimer();
+        pauseButton.querySelector('span').textContent = 'Pause timer';
+        pauseButton.classList.remove('paused');
+    }
 }
 
 function updateCountdown() {
@@ -187,6 +210,7 @@ async function initialize() {
     const intervalInput = document.getElementById('interval');
     const updateButton = document.getElementById('update-interval');
     const toggleButton = document.getElementById('details-toggle');
+    const pauseButton = document.getElementById('pause-toggle');
     const statusElement = document.querySelector('.status');
 
     if (intervalInput) {
@@ -199,6 +223,10 @@ async function initialize() {
 
     if (toggleButton) {
         toggleButton.addEventListener('click', toggleDetails);
+    }
+
+    if (pauseButton) {
+        pauseButton.addEventListener('click', togglePause);
     }
 
     if (statusElement) {
@@ -215,6 +243,7 @@ async function initialize() {
         }
     });
 
+    elapsedMs = parseInt(sessionStorage.getItem('nosleep_elapsed') || '0');
     startTime = Date.now();
 
     wakeTimer = setInterval(preventSleep, wakeInterval);

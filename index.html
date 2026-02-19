@@ -30,7 +30,7 @@
         <h1>No Sleep</h1>
 
         <div class="timer">
-            <span class="running-for">Running for:</span> <br /><span id="time">00:00:00</span>
+            <span class="running-for">Running for:</span> <br /><span id="time"></span>
         </div>
 
         <button class="details-toggle" id="details-toggle">More</button>
@@ -49,6 +49,17 @@
             </div>
 
             <div id="interval-error" class="error-message"></div>
+
+            <button class="pause-toggle" id="pause-toggle">
+                <span>Pause timer</span>
+                <svg class="icon-pause" width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                    <rect x="6" y="4" width="4" height="16"></rect>
+                    <rect x="14" y="4" width="4" height="16"></rect>
+                </svg>
+                <svg class="icon-play" width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                    <polygon points="5,3 19,12 5,21"></polygon>
+                </svg>
+            </button>
         </div>
     </div>
 
