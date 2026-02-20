@@ -15,10 +15,11 @@
 //        run: |
 //          BUILD_TIME=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
 //          PROJECT=$(basename "$GITHUB_REPOSITORY")
-//          sed -i "s|BUILD_TIMESTAMP_PLACEHOLDER|$BUILD_TIME|g" build-info.js
-//          sed -i "s|PROJECT_NAME_PLACEHOLDER|$PROJECT|g" build-info.js
+//          BUILD_INFO=$(find . -name "build-info.js" -not -path "./.git/*")
+//          sed -i "s|BUILD_TIMESTAMP_PLACEHOLDER|$BUILD_TIME|g" $BUILD_INFO
+//          sed -i "s|PROJECT_NAME_PLACEHOLDER|$PROJECT|g" $BUILD_INFO
 //
-//    Adjust the path to build-info.js if it's in a subdirectory (e.g. src/build-info.js).
+//    Using find means this works regardless of where build-info.js lives in your repo.
 //
 // 3a. Vanilla HTML — include this script tag (no other setup needed,
 //     it logs to console automatically when the page loads):
