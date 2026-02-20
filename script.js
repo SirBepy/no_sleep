@@ -1,5 +1,3 @@
-const BUILD_TIMESTAMP = 'BUILD_TIMESTAMP_PLACEHOLDER';
-
 let wakeInterval = 30000;
 let countdownTimer;
 let wakeTimer;
@@ -168,36 +166,7 @@ function toggleDetails() {
     toggleButton.classList.toggle('open');
 }
 
-function getRelativeTime(utcDateString) {
-    const buildDate = new Date(utcDateString);
-    const now = new Date();
-    const diffMs = now - buildDate;
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    let relative;
-    if (diffMins < 1) relative = 'just now';
-    else if (diffMins < 60) relative = `${diffMins} minute${diffMins === 1 ? '' : 's'} ago`;
-    else if (diffHours < 24) relative = `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
-    else relative = `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
-
-    const localTime = buildDate.toLocaleString(undefined, {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true
-    });
-
-    return `${relative} (${localTime})`;
-}
-
 async function initialize() {
-    console.log(`%cNo Sleep App`, 'font-size: 16px; font-weight: bold; color: #2c3e50;');
-    console.log(`Last updated: ${getRelativeTime(BUILD_TIMESTAMP)}`);
-
     wakeLockSupported = 'wakeLock' in navigator;
 
     if (wakeLockSupported) {
