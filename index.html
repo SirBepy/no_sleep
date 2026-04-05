@@ -5,13 +5,24 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>No Sleep Page</title>
-    <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
-    <link rel="stylesheet" href="styles.css">
+    <meta name="description" content="A lightweight web page that keeps your computer awake, no installs needed.">
+    <meta property="og:title" content="No Sleep">
+    <meta property="og:description" content="A lightweight web page that keeps your computer awake, no installs needed.">
+    <meta property="og:image" content="assets/images/favicon.png">
+    <meta property="og:url" content="https://sirbepy.github.io/no_sleep/">
+    <meta name="twitter:card" content="summary">
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="icon" type="image/png" href="assets/images/favicon.png">
+    <link rel="icon" type="image/svg+xml" href="assets/images/favicon.svg">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#9d7dfc">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/sirbepy/bepy-project-init@main/styleguide.css">
+    <link rel="stylesheet" href="src/styles/styles.css">
 </head>
 
 <body>
     <div class="force-behind gradient-background"></div>
-    <div class="container">
+    <div class="container card">
         <div class="info-button" id="info-button">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="10"></circle>
@@ -33,9 +44,9 @@
             <span class="running-for">Running for:</span> <br /><span id="time"></span>
         </div>
 
-        <button class="details-toggle" id="details-toggle">More</button>
+        <button class="details-toggle btn btn-ghost" id="details-toggle">More</button>
 
-        <div class="technical-details gradient-background" id="technical-details">
+        <div class="technical-details gradient-background card-alt" id="technical-details">
             <p>The page runs a small function periodically to keep your computer awake:</p>
 
             <div class="next-execution">
@@ -44,13 +55,13 @@
 
             <div class="interval-control">
                 <label for="interval">Wake function interval:</label>
-                <input type="number" id="interval" min="5" max="300" value="30"> seconds
-                <button id="update-interval">Update</button>
+                <input class="input" type="number" id="interval" min="5" max="300" value="30"> seconds
+                <button class="btn btn-primary" id="update-interval">Update</button>
             </div>
 
             <div id="interval-error" class="error-message"></div>
 
-            <button class="pause-toggle" id="pause-toggle">
+            <button class="pause-toggle btn btn-outline" id="pause-toggle">
                 <span>Pause timer</span>
                 <svg class="icon-pause" width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
                     <rect x="6" y="4" width="4" height="16"></rect>
@@ -67,8 +78,17 @@
         Keep this tab open to prevent your system from sleeping.
     </div>
 
-    <script type="module" src="build-info.js"></script>
-    <script src="script.js"></script>
+    <script type="module" src="src/scripts/build-info.js"></script>
+    <script src="src/scripts/script.js"></script>
+    <!-- Settings widget - comment out to disable -->
+    <script src="https://cdn.jsdelivr.net/gh/sirbepy/bepy-project-init@main/widget/settings.js"></script>
+    <!-- Animated background. To disable: set window.BEPY_BACKGROUND = false before this tag. To use a custom SVG: set window.BEPY_BG_PATTERN = 'your-pattern.svg' before this tag. -->
+    <script src="https://cdn.jsdelivr.net/gh/sirbepy/bepy-project-init@main/widget/background.js"></script>
+    <script>
+        if ("serviceWorker" in navigator) {
+            navigator.serviceWorker.register("/sw.js");
+        }
+    </script>
 </body>
 
 </html>

@@ -1,0 +1,14 @@
+{
+  "title": "No Sleep",
+  "shortDescription": "Browser-based tool that keeps your computer awake using the Wake Lock API.",
+  "type": "Web",
+  "status": "finished",
+  "languages": ["HTML", "CSS", "JavaScript"],
+  "frameworks": [],
+  "tools": [],
+  "liveUrl": "https://sirbepy.github.io/no_sleep/",
+  "mainImage": "screenshot-1.png",
+  "images": ["screenshot-1.png"],
+  "year": 2026,
+  "impressiveness": 2
+}
