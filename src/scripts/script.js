@@ -1,5 +1,4 @@
 let wakeInterval = 30000;
-let countdownTimer;
 let wakeTimer;
 let runningTimer;
 let startTime;
@@ -52,7 +51,7 @@ function updateStatus(isActive) {
 }
 
 function preventSleep() {
-    resetCountdown();
+    // Wake lock re-acquisition handled by visibility change
 }
 
 function renderTimer() {
@@ -79,6 +78,7 @@ function updateTimer() {
 
 function togglePause() {
     const pauseButton = document.getElementById('pause-toggle');
+    const pauseHint = document.getElementById('pause-hint');
     if (!pauseButton) return;
 
     isPaused = !isPaused;
@@ -87,83 +87,15 @@ function togglePause() {
         elapsedMs += Date.now() - startTime;
         clearInterval(runningTimer);
         pauseButton.querySelector('span').textContent = 'Resume';
-        pauseButton.classList.add('paused');
+        pauseButton.classList.add('active');
+        if (pauseHint) pauseHint.classList.add('visible');
     } else {
         startTime = Date.now();
         updateTimer();
-        pauseButton.querySelector('span').textContent = 'Pause timer';
-        pauseButton.classList.remove('paused');
+        pauseButton.querySelector('span').textContent = 'Pause';
+        pauseButton.classList.remove('active');
+        if (pauseHint) pauseHint.classList.remove('visible');
     }
-}
-
-function updateCountdown() {
-    const countdownElement = document.getElementById('countdown');
-    if (!countdownElement) return;
-
-    let secondsLeft = Math.floor(wakeInterval / 1000);
-
-    clearInterval(countdownTimer);
-
-    countdownTimer = setInterval(() => {
-        secondsLeft--;
-        countdownElement.textContent = secondsLeft;
-
-        if (secondsLeft <= 0) {
-            secondsLeft = Math.floor(wakeInterval / 1000);
-        }
-    }, 1000);
-}
-
-function resetCountdown() {
-    const countdownElement = document.getElementById('countdown');
-    if (!countdownElement) return;
-
-    const secondsLeft = Math.floor(wakeInterval / 1000);
-    countdownElement.textContent = secondsLeft;
-}
-
-function showError(message) {
-    const errorElement = document.getElementById('interval-error');
-    if (!errorElement) return;
-
-    errorElement.textContent = message;
-    errorElement.style.display = 'block';
-
-    setTimeout(() => {
-        errorElement.style.display = 'none';
-    }, 3000);
-}
-
-function updateWakeInterval() {
-    const intervalInput = document.getElementById('interval');
-    if (!intervalInput) return;
-
-    const newInterval = parseInt(intervalInput.value);
-
-    if (newInterval >= 5 && newInterval <= 300) {
-        wakeInterval = newInterval * 1000;
-
-        clearInterval(wakeTimer);
-        clearInterval(countdownTimer);
-
-        wakeTimer = setInterval(preventSleep, wakeInterval);
-
-        resetCountdown();
-        updateCountdown();
-    } else {
-        showError('Please enter a value between 5 and 300 seconds.');
-        intervalInput.value = Math.floor(wakeInterval / 1000);
-    }
-}
-
-function toggleDetails() {
-    const detailsSection = document.getElementById('technical-details');
-    const toggleButton = document.getElementById('details-toggle');
-
-    if (!detailsSection || !toggleButton) return;
-
-    detailsSection.classList.toggle('visible');
-    toggleButton.classList.toggle('open');
 }
 
 async function initialize() {
@@ -176,23 +108,8 @@ async function initialize() {
         updateStatus(false);
     }
 
-    const intervalInput = document.getElementById('interval');
-    const updateButton = document.getElementById('update-interval');
-    const toggleButton = document.getElementById('details-toggle');
     const pauseButton = document.getElementById('pause-toggle');
     const statusElement = document.querySelector('.status');
-
-    if (intervalInput) {
-        intervalInput.value = Math.floor(wakeInterval / 1000);
-    }
-
-    if (updateButton) {
-        updateButton.addEventListener('click', updateWakeInterval);
-    }
-
-    if (toggleButton) {
-        toggleButton.addEventListener('click', toggleDetails);
-    }
 
     if (pauseButton) {
         pauseButton.addEventListener('click', togglePause);
@@ -216,7 +133,6 @@ async function initialize() {
     startTime = Date.now();
 
     wakeTimer = setInterval(preventSleep, wakeInterval);
-    updateCountdown();
     updateTimer();
     preventSleep();
 
