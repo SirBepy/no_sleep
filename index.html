@@ -53,6 +53,19 @@
     <script src="src/scripts/script.js"></script>
     <!-- Settings widget - comment out to disable -->
     <script src="https://cdn.jsdelivr.net/gh/sirbepy/sirbepy-styleguide@main/widget/settings.js"></script>
+    <!-- Register custom background variant before loading background.js -->
+    <script>
+      window.BEPY_BG_VARIANTS = [{
+        key: "pulse",
+        label: "Pulse",
+        build: function () {
+          var el = document.createElement("div");
+          el.id = "bepy-bg-pulse";
+          var css = "\n            #bepy-bg-pulse {\n              position: relative;\n              width: 100%; height: 100%;\n              background: radial-gradient(circle at center, #8ec5fc, #e0c3fc);\n              background-size: 200% 200%;\n              animation: bepy-pulse 15s ease infinite;\n            }\n            @keyframes bepy-pulse {\n              0%   { background-size: 100% 100%; background-position: center; }\n              50%  { background-size: 200% 200%; background-position: center; }\n              100% { background-size: 100% 100%; background-position: center; }\n            }\n          ";
+          return { el: el, css: css };
+        }
+      }];
+    </script>
     <!-- Animated background. To disable: set window.BEPY_BACKGROUND = false before this tag. To use a custom SVG: set window.BEPY_BG_PATTERN = 'your-pattern.svg' before this tag. -->
     <script src="https://cdn.jsdelivr.net/gh/sirbepy/sirbepy-styleguide@main/widget/background.js"></script>
     <script>
