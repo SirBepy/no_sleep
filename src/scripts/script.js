@@ -6,6 +6,38 @@ let elapsedMs = 0;
 let isPaused = false;
 let wakeLock = null;
 let wakeLockSupported = false;
+let audioCtx = null;
+let silentOscillator = null;
+
+function ensureAudioContext() {
+    if (audioCtx) return;
+    try {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return;
+        audioCtx = new Ctx();
+        const gain = audioCtx.createGain();
+        gain.gain.value = 0;
+        silentOscillator = audioCtx.createOscillator();
+        silentOscillator.connect(gain);
+        gain.connect(audioCtx.destination);
+        silentOscillator.start();
+    } catch (err) {
+        console.error('AudioContext init failed:', err);
+    }
+}
+
+async function startSilentAudio() {
+    ensureAudioContext();
+    if (audioCtx && audioCtx.state === 'suspended') {
+        try { await audioCtx.resume(); } catch (err) { console.error(err); }
+    }
+}
+
+async function stopSilentAudio() {
+    if (audioCtx && audioCtx.state === 'running') {
+        try { await audioCtx.suspend(); } catch (err) { console.error(err); }
+    }
+}
 
 async function requestWakeLock() {
     if (!wakeLockSupported) return false;
@@ -124,10 +156,15 @@ async function initialize() {
     }
 
     document.addEventListener('visibilitychange', async () => {
-        if (document.visibilityState === 'visible' && wakeLockSupported) {
-            await requestWakeLock();
+        if (document.visibilityState === 'visible') {
+            await stopSilentAudio();
+            if (wakeLockSupported) await requestWakeLock();
+        } else {
+            await startSilentAudio();
         }
     });
+
+    document.addEventListener('click', ensureAudioContext, { once: true });
 
     elapsedMs = parseInt(sessionStorage.getItem('nosleep_elapsed') || '0');
     startTime = Date.now();
