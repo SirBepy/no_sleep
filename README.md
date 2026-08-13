@@ -1,5 +1,3 @@
-<!-- TODO: one day consider stylized SVG title headers instead of plain markdown headings -->
-
 <img src="assets/images/favicon.png" width="48" alt="project icon" />
 
 # No Sleep
