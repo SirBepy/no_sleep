@@ -1,4 +1,4 @@
-// History dialog (last 30 days, grouped by day) and the Add entry dialog.
+// History dialog (last 30 days, grouped by day) with an inline Add entry form.
 import {
     buildManualEntry,
     clockLabel,
@@ -27,17 +27,21 @@ function icon(name) {
 /**
  * @param {object} deps
  * @param {() => object|null} deps.getStore  loaded Firebase store, or null while it is unavailable
- * @param {() => Promise<boolean>} deps.ensureSignedIn  prompts Google sign-in; true once signed in
+ * @param {() => boolean} deps.isSignedIn
+ * @param {() => Promise<boolean>} deps.signIn  runs Google sign-in; true once signed in
  * @param {() => string|null} deps.getLiveId  id of the session this page is recording right now
+ * @param {() => number} deps.getLiveElapsedMs  the running timer, so the Now row ticks between saves
  */
-export function createHistory({ getStore, ensureSignedIn, getLiveId }) {
+export function createHistory({ getStore, isSignedIn, signIn, getLiveId, getLiveElapsedMs }) {
     const dialog = $('history-dialog');
     const body = $('history-body');
-    const entryDialog = $('entry-dialog');
+    const form = $('entry-form');
+    const addButton = $('history-add');
     let stopWatching = null;
     let status = 'loading';
     let rows = [];
     let confirmId = null;
+    let liveTicker = null;
 
     function renderEntry(row) {
         const isLive = row.id === getLiveId();
@@ -47,13 +51,19 @@ export function createHistory({ getStore, ensureSignedIn, getLiveId }) {
         const main = el('div', 'entry-main');
         main.append(el('span', 'entry-range', `${clockLabel(row.startedAt)} - ${isLive ? 'now' : clockLabel(row.endedAt ?? row.startedAt)}`));
         const note = isLive ? 'Current session' : row.note;
-        if (note) main.append(el('span', 'entry-note', note));
+        if (note) {
+            const noteEl = el('span', 'entry-note', note);
+            noteEl.title = note;
+            main.append(noteEl);
+        }
         item.append(main);
 
         if (isLive) item.append(el('span', 'badge badge-success badge-sm', 'Now'));
         else if (row.manual) item.append(el('span', 'badge badge-info badge-sm', 'manual'));
 
-        item.append(el('span', 'entry-duration', formatDuration(sessionDurationMs(row))));
+        const duration = el('span', 'entry-duration', formatDuration(isLive ? getLiveElapsedMs() : sessionDurationMs(row)));
+        if (isLive) duration.dataset.liveDuration = '1';
+        item.append(duration);
 
         if (!isLive) {
             if (confirmId === row.id) {
@@ -80,6 +90,20 @@ export function createHistory({ getStore, ensureSignedIn, getLiveId }) {
 
     function render() {
         body.replaceChildren();
+        const signedIn = isSignedIn();
+        addButton.hidden = !signedIn;
+        if (!signedIn) {
+            form.hidden = true;
+            const prompt = el('div', 'history-signin');
+            prompt.append(el('p', '', 'Sign in with Google to see your history. Your sessions are saved to your account, so clearing the browser never loses them.'));
+            const button = el('button', 'btn btn-primary btn-sm', 'Sign in with Google');
+            button.type = 'button';
+            button.dataset.signin = '1';
+            prompt.append(button);
+            body.append(prompt);
+            $('history-total').textContent = '-';
+            return;
+        }
         if (status === 'loading') {
             for (let i = 0; i < 3; i++) body.append(el('div', 'skeleton'));
             $('history-total').textContent = '-';
@@ -100,17 +124,10 @@ export function createHistory({ getStore, ensureSignedIn, getLiveId }) {
         const now = Date.now();
         // Rows older than the window can still sit in the local cache, so the window is applied here too.
         const visible = rows.filter((r) => r.startedAt >= cutoffMs(now));
+        const liveId = getLiveId();
+        const hasLiveRow = visible.some((r) => r.id === liveId);
+        const savedCount = visible.length - (hasLiveRow ? 1 : 0);
         $('history-total').textContent = formatDuration(totalMs(visible));
-
-        const saved = visible.filter((r) => r.id !== getLiveId());
-        if (saved.length === 0) {
-            const empty = el('div', 'history-empty');
-            empty.append(icon('hourglass-medium'));
-            empty.append(el('p', '', 'Nothing saved yet. Finished sessions and manual entries land here.'));
-            empty.append(el('p', '', 'Forgot to track something? Use Add entry.'));
-            body.append(empty);
-            if (visible.length === 0) return;
-        }
 
         for (const group of groupByDay(visible)) {
             const day = el('div', 'day');
@@ -120,10 +137,26 @@ export function createHistory({ getStore, ensureSignedIn, getLiveId }) {
             for (const row of group.sessions) day.append(renderEntry(row));
             body.append(day);
         }
+
+        if (savedCount === 0) {
+            const empty = el('div', 'history-empty');
+            empty.append(el('p', '', 'Nothing saved yet. Finished sessions and manual entries land here.'));
+            body.append(empty);
+        }
+    }
+
+    function tickLive() {
+        const node = body.querySelector('[data-live-duration]');
+        if (node) node.textContent = formatDuration(getLiveElapsedMs());
     }
 
     function startWatching() {
         stopWatching?.();
+        stopWatching = null;
+        if (!isSignedIn()) {
+            render();
+            return;
+        }
         status = 'loading';
         render();
         const store = getStore();
@@ -153,16 +186,34 @@ export function createHistory({ getStore, ensureSignedIn, getLiveId }) {
         }
     }
 
-    async function open() {
-        if (!(await ensureSignedIn())) return;
+    function open() {
         confirmId = null;
+        form.hidden = true;
         dialog.showModal();
         startWatching();
+        liveTicker = setInterval(tickLive, 1000);
+    }
+
+    /** Called when sign-in state changes while the dialog may be open. */
+    function refresh() {
+        if (dialog.open) startWatching();
     }
 
     dialog.addEventListener('close', () => {
         stopWatching?.();
         stopWatching = null;
+        clearInterval(liveTicker);
+    });
+
+    // Escape closes just the form while it is open, the whole dialog otherwise.
+    // Handled on keydown: preventing it stops the browser's own close request, which a `cancel`
+    // listener cannot reliably veto.
+    dialog.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Escape' && !form.hidden) {
+            ev.preventDefault();
+            form.hidden = true;
+            addButton.focus();
+        }
     });
 
     dialog.addEventListener('click', async (ev) => {
@@ -188,11 +239,16 @@ export function createHistory({ getStore, ensureSignedIn, getLiveId }) {
             render();
         } else if (button.dataset.retry) {
             startWatching();
+        } else if (button.dataset.signin) {
+            await signIn();
         }
     });
 
     $('history-close').addEventListener('click', () => dialog.close());
-    $('history-add').addEventListener('click', openEntryForm);
+    addButton.addEventListener('click', () => {
+        if (form.hidden) openEntryForm();
+        else form.hidden = true;
+    });
 
     // ----- Add entry -----
     const fields = {
@@ -204,21 +260,17 @@ export function createHistory({ getStore, ensureSignedIn, getLiveId }) {
     const preview = $('entry-preview');
     const saveButton = $('entry-save');
 
-    function readForm() {
-        return buildManualEntry(
+    function validateForm() {
+        const { session, error } = buildManualEntry(
             { date: fields.date.value, start: fields.start.value, stop: fields.stop.value, note: fields.note.value },
             Date.now(),
         );
-    }
-
-    function validateForm() {
-        const { session, error } = readForm();
         const untouched = !fields.start.value || !fields.stop.value;
         preview.classList.toggle('bad', Boolean(error) && !untouched);
         preview.textContent = session
             ? formatDuration(session.activeMs)
             : untouched
-                ? 'Pick a start and stop time'
+                ? 'Pick start and stop'
                 : error;
         saveButton.disabled = !session;
         return session;
@@ -232,31 +284,21 @@ export function createHistory({ getStore, ensureSignedIn, getLiveId }) {
         fields.stop.value = '';
         fields.note.value = '';
         validateForm();
-        entryDialog.showModal();
+        form.hidden = false;
+        fields.start.focus();
     }
 
     for (const field of Object.values(fields)) field.addEventListener('input', validateForm);
 
-    $('entry-cancel').addEventListener('click', () => entryDialog.close());
-    entryDialog.addEventListener('click', (ev) => {
-        if (ev.target === entryDialog) entryDialog.close();
-    });
-    $('entry-form').addEventListener('submit', async (ev) => {
+    $('entry-cancel').addEventListener('click', () => { form.hidden = true; });
+    form.addEventListener('submit', (ev) => {
         ev.preventDefault();
         const session = validateForm();
         if (!session) return;
-        saveButton.disabled = true;
-        try {
-            // Not awaited to completion: offline, the write queues locally and the snapshot listener shows it at once.
-            getStore().saveSession(crypto.randomUUID(), session).catch((err) => console.error('Entry save failed:', err));
-            entryDialog.close();
-        } catch (err) {
-            console.error('Entry save failed:', err);
-            preview.classList.add('bad');
-            preview.textContent = 'Could not save, try again';
-            saveButton.disabled = false;
-        }
+        // Not awaited to completion: offline, the write queues locally and the snapshot listener shows it at once.
+        getStore().saveSession(crypto.randomUUID(), session).catch((err) => console.error('Entry save failed:', err));
+        form.hidden = true;
     });
 
-    return { open };
+    return { open, refresh };
 }
