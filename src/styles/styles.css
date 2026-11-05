@@ -461,6 +461,21 @@ h1 {
   min-height: 0;
 }
 
+/* The selected day's title reads as the panel's header: bright, larger, with a full-width rule above the scrolling list. */
+.day-detail .day-head {
+  flex: none;
+  padding-bottom: 10px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-text);
+  border-bottom: 2px solid var(--color-primary);
+}
+
+.day-detail .day-head b {
+  font-size: 1.1rem;
+  color: var(--color-primary);
+}
+
 .day-list {
   flex: 1;
   min-height: 0;
