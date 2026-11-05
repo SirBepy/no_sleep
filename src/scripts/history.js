@@ -1,14 +1,20 @@
-// History dialog (last 30 days, grouped by day) with an inline Add entry form.
+// History dialog: today hour by hour, a month calendar of daily totals underneath, and the exact
+// hours of any clicked day inline below the calendar. Add entry is an inline form in the dialog.
 import {
+    addMonths,
     buildManualEntry,
     clockLabel,
-    cutoffMs,
     dayKey,
     dayLabel,
     formatDuration,
-    groupByDay,
+    monthGrid,
+    monthOf,
+    monthRange,
     sessionDurationMs,
+    shadeLevel,
+    startOfDay,
     totalMs,
+    totalsByDay,
 } from './sessions.js';
 
 const $ = (id) => document.getElementById(id);
@@ -24,6 +30,13 @@ function icon(name) {
     return el('i', `ph ph-${name}`);
 }
 
+function button(className, label, data) {
+    const node = el('button', className, label);
+    node.type = 'button';
+    Object.assign(node.dataset, data);
+    return node;
+}
+
 /**
  * @param {object} deps
  * @param {() => object|null} deps.getStore  loaded Firebase store, or null while it is unavailable
@@ -37,11 +50,22 @@ export function createHistory({ getStore, isSignedIn, signIn, getLiveId, getLive
     const body = $('history-body');
     const form = $('entry-form');
     const addButton = $('history-add');
-    let stopWatching = null;
-    let status = 'loading';
-    let rows = [];
-    let confirmId = null;
+
+    // todayRows and monthRows come from two live queries: today is always needed, the month follows the arrows.
+    const state = {
+        month: monthOf(Date.now()),
+        selected: null,
+        todayRows: [],
+        monthRows: [],
+        todayStatus: 'loading',
+        monthStatus: 'loading',
+        confirmId: null,
+    };
+    let stopToday = null;
+    let stopMonth = null;
     let liveTicker = null;
+
+    // ----- Rendering -----
 
     function renderEntry(row) {
         const isLive = row.id === getLiveId();
@@ -66,20 +90,12 @@ export function createHistory({ getStore, isSignedIn, signIn, getLiveId, getLive
         item.append(duration);
 
         if (!isLive) {
-            if (confirmId === row.id) {
+            if (state.confirmId === row.id) {
                 const confirm = el('span', 'entry-confirm', 'Delete? ');
-                const yes = el('button', 'confirm-yes', 'Yes');
-                yes.type = 'button';
-                yes.dataset.delete = row.id;
-                const no = el('button', '', 'No');
-                no.type = 'button';
-                no.dataset.deleteCancel = '1';
-                confirm.append(yes, no);
+                confirm.append(button('confirm-yes', 'Yes', { delete: row.id }), button('', 'No', { deleteCancel: '1' }));
                 item.append(confirm);
             } else {
-                const del = el('button', 'entry-delete');
-                del.type = 'button';
-                del.dataset.ask = row.id;
+                const del = button('entry-delete', '', { ask: row.id });
                 del.setAttribute('aria-label', 'Delete entry');
                 del.append(icon('trash'));
                 item.append(del);
@@ -88,7 +104,135 @@ export function createHistory({ getStore, isSignedIn, signIn, getLiveId, getLive
         return item;
     }
 
+    function dayHead(label, ms) {
+        const head = el('div', 'day-head');
+        head.append(el('span', '', label), el('b', '', formatDuration(ms)));
+        return head;
+    }
+
+    function errorBox(message) {
+        const box = el('div', 'history-error');
+        box.append(el('span', '', message), button('btn btn-ghost btn-sm', 'Retry', { retry: '1' }));
+        return box;
+    }
+
+    function skeletons(count) {
+        const wrap = el('div');
+        for (let i = 0; i < count; i++) wrap.append(el('div', 'skeleton'));
+        return wrap;
+    }
+
+    function todaySection(now) {
+        const section = el('section', 'day');
+        if (state.todayStatus === 'error') {
+            section.append(dayHead('Today', 0), errorBox('Could not load today.'));
+            return section;
+        }
+        if (state.todayStatus === 'loading') {
+            section.append(dayHead('Today', 0), skeletons(1));
+            return section;
+        }
+        const rows = state.todayRows
+            .filter((r) => r.startedAt >= startOfDay(now))
+            .sort((a, b) => b.startedAt - a.startedAt);
+        section.append(dayHead('Today', todayTotal(rows)));
+        for (const row of rows) section.append(renderEntry(row));
+        if (rows.length === 0) section.append(el('p', 'history-hint', 'Nothing tracked yet today.'));
+        return section;
+    }
+
+    /** The running session counts at its live value, not the last saved heartbeat. */
+    function todayTotal(rows) {
+        const liveId = getLiveId();
+        return rows.reduce((sum, r) => sum + (r.id === liveId ? getLiveElapsedMs() : sessionDurationMs(r)), 0);
+    }
+
+    function calendarSection(now) {
+        const section = el('section', 'calendar');
+        const today = dayKey(now);
+        const isCurrentMonth = state.month.year === monthOf(now).year && state.month.month === monthOf(now).month;
+
+        const label = new Date(state.month.year, state.month.month, 1)
+            .toLocaleDateString([], { month: 'long', year: 'numeric' });
+        const head = el('div', 'cal-head');
+        const prev = button('cal-nav', '', { monthStep: '-1' });
+        prev.setAttribute('aria-label', 'Previous month');
+        prev.append(icon('caret-left'));
+        const next = button('cal-nav', '', { monthStep: '1' });
+        next.setAttribute('aria-label', 'Next month');
+        next.append(icon('caret-right'));
+        next.disabled = isCurrentMonth;
+        head.append(prev, el('h3', 'cal-title', label), next);
+        section.append(head);
+
+        if (state.monthStatus === 'error') {
+            section.append(errorBox('Could not load this month.'));
+            return section;
+        }
+        if (state.monthStatus === 'loading') {
+            section.append(skeletons(3));
+            return section;
+        }
+
+        const totals = totalsByDay(state.monthRows);
+        if (isCurrentMonth) totals.set(today, todayTotal(state.todayRows.filter((r) => r.startedAt >= startOfDay(now))));
+        const monthTotal = [...totals.values()].reduce((a, b) => a + b, 0);
+        const busiest = Math.max(0, ...totals.values());
+        head.after(el('div', 'cal-total', monthTotal ? `${formatDuration(monthTotal)} this month` : 'Nothing tracked this month'));
+
+        const grid = el('div', 'cal-grid');
+        for (let i = 0; i < 7; i++) {
+            // 2024-01-01 is a Monday, so these narrow names run Monday to Sunday like the grid.
+            grid.append(el('span', 'cal-dow', new Date(2024, 0, 1 + i).toLocaleDateString([], { weekday: 'narrow' })));
+        }
+        for (const key of monthGrid(state.month)) {
+            if (!key) {
+                grid.append(el('span', 'cal-blank'));
+                continue;
+            }
+            const ms = totals.get(key) || 0;
+            const [y, m, d] = key.split('-').map(Number);
+            const cell = button('cal-day', '', { day: key });
+            const future = key > today;
+            cell.disabled = future;
+            if (key === today) cell.classList.add('is-today');
+            if (key === state.selected) cell.classList.add('is-selected');
+            if (ms) cell.style.setProperty('--shade', String(shadeLevel(ms, busiest)));
+            cell.append(el('span', 'cal-num', String(d)), el('span', 'cal-hours', ms ? formatDuration(ms) : ''));
+            const spoken = new Date(y, m - 1, d).toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
+            cell.setAttribute('aria-label', ms ? `${spoken}, ${formatDuration(ms)} tracked` : spoken);
+            if (key === state.selected) cell.setAttribute('aria-pressed', 'true');
+            grid.append(cell);
+        }
+        section.append(grid);
+        section.append(dayDetail(now));
+        return section;
+    }
+
+    function dayDetail(now) {
+        const detail = el('div', 'day-detail');
+        detail.id = 'day-detail';
+        if (!state.selected) {
+            detail.append(el('p', 'history-hint', 'Pick a day to see its exact hours.'));
+            return detail;
+        }
+        const rows = state.monthRows
+            .filter((r) => dayKey(r.startedAt) === state.selected)
+            .sort((a, b) => b.startedAt - a.startedAt);
+        const day = el('div', 'day');
+        day.append(dayHead(dayLabel(state.selected, now), totalMs(rows)));
+        for (const row of rows) day.append(renderEntry(row));
+        if (rows.length === 0) day.append(el('p', 'history-hint', 'Nothing tracked this day.'));
+        day.append(button('btn btn-ghost btn-sm detail-add', 'Add entry for this day', { addForDay: state.selected }));
+        detail.append(day);
+        return detail;
+    }
+
     function render() {
+        // Re-rendering replaces every node, so keyboard focus is handed back to the same calendar day afterwards.
+        const focusedDay = document.activeElement && document.activeElement.dataset
+            ? document.activeElement.dataset.day
+            : null;
         body.replaceChildren();
         const signedIn = isSignedIn();
         addButton.hidden = !signedIn;
@@ -96,53 +240,13 @@ export function createHistory({ getStore, isSignedIn, signIn, getLiveId, getLive
             form.hidden = true;
             const prompt = el('div', 'history-signin');
             prompt.append(el('p', '', 'Sign in with Google to see your history. Your sessions are saved to your account, so clearing the browser never loses them.'));
-            const button = el('button', 'btn btn-primary btn-sm', 'Sign in with Google');
-            button.type = 'button';
-            button.dataset.signin = '1';
-            prompt.append(button);
+            prompt.append(button('btn btn-primary btn-sm', 'Sign in with Google', { signin: '1' }));
             body.append(prompt);
-            $('history-total').textContent = '-';
             return;
         }
-        if (status === 'loading') {
-            for (let i = 0; i < 3; i++) body.append(el('div', 'skeleton'));
-            $('history-total').textContent = '-';
-            return;
-        }
-        if (status === 'error') {
-            const box = el('div', 'history-error');
-            box.append(el('span', '', 'Could not load your history.'));
-            const retry = el('button', 'btn btn-ghost btn-sm', 'Retry');
-            retry.type = 'button';
-            retry.dataset.retry = '1';
-            box.append(retry);
-            body.append(box);
-            $('history-total').textContent = '-';
-            return;
-        }
-
         const now = Date.now();
-        // Rows older than the window can still sit in the local cache, so the window is applied here too.
-        const visible = rows.filter((r) => r.startedAt >= cutoffMs(now));
-        const liveId = getLiveId();
-        const hasLiveRow = visible.some((r) => r.id === liveId);
-        const savedCount = visible.length - (hasLiveRow ? 1 : 0);
-        $('history-total').textContent = formatDuration(totalMs(visible));
-
-        for (const group of groupByDay(visible)) {
-            const day = el('div', 'day');
-            const head = el('div', 'day-head');
-            head.append(el('span', '', dayLabel(group.key, now)), el('b', '', formatDuration(group.totalMs)));
-            day.append(head);
-            for (const row of group.sessions) day.append(renderEntry(row));
-            body.append(day);
-        }
-
-        if (savedCount === 0) {
-            const empty = el('div', 'history-empty');
-            empty.append(el('p', '', 'Nothing saved yet. Finished sessions and manual entries land here.'));
-            body.append(empty);
-        }
+        body.append(todaySection(now), calendarSection(now));
+        if (focusedDay) body.querySelector(`[data-day="${focusedDay}"]`)?.focus();
     }
 
     function tickLive() {
@@ -150,44 +254,62 @@ export function createHistory({ getStore, isSignedIn, signIn, getLiveId, getLive
         if (node) node.textContent = formatDuration(getLiveElapsedMs());
     }
 
-    function startWatching() {
-        stopWatching?.();
-        stopWatching = null;
-        if (!isSignedIn()) {
+    // ----- Data -----
+
+    function failed(which) {
+        return (err) => {
+            console.error(`History ${which} load failed:`, err);
+            state[`${which}Status`] = 'error';
             render();
-            return;
-        }
-        status = 'loading';
-        render();
+        };
+    }
+
+    function watch(which, range, onRows) {
         const store = getStore();
         if (!store) {
-            status = 'error';
-            render();
-            return;
+            state[`${which}Status`] = 'error';
+            return null;
         }
         try {
-            stopWatching = store.watchSessions(
-                cutoffMs(Date.now()),
-                (list) => {
-                    rows = list;
-                    status = 'ready';
-                    render();
-                },
-                (err) => {
-                    console.error('History load failed:', err);
-                    status = 'error';
-                    render();
-                },
-            );
+            return store.watchSessions(range, (rows) => {
+                onRows(rows);
+                state[`${which}Status`] = 'ready';
+                render();
+            }, failed(which));
         } catch (err) {
-            console.error('History load failed:', err);
-            status = 'error';
-            render();
+            failed(which)(err);
+            return null;
         }
     }
 
+    function watchToday() {
+        stopToday?.();
+        state.todayStatus = 'loading';
+        stopToday = watch('today', { since: startOfDay(Date.now()) }, (rows) => { state.todayRows = rows; });
+    }
+
+    function watchMonth() {
+        stopMonth?.();
+        state.monthStatus = 'loading';
+        stopMonth = watch('month', monthRange(state.month), (rows) => { state.monthRows = rows; });
+    }
+
+    function startWatching() {
+        stopToday?.();
+        stopMonth?.();
+        stopToday = null;
+        stopMonth = null;
+        if (isSignedIn()) {
+            watchToday();
+            watchMonth();
+        }
+        render();
+    }
+
     function open() {
-        confirmId = null;
+        state.month = monthOf(Date.now());
+        state.selected = null;
+        state.confirmId = null;
         form.hidden = true;
         dialog.showModal();
         startWatching();
@@ -200,14 +322,15 @@ export function createHistory({ getStore, isSignedIn, signIn, getLiveId, getLive
     }
 
     dialog.addEventListener('close', () => {
-        stopWatching?.();
-        stopWatching = null;
+        stopToday?.();
+        stopMonth?.();
+        stopToday = null;
+        stopMonth = null;
         clearInterval(liveTicker);
     });
 
-    // Escape closes just the form while it is open, the whole dialog otherwise.
-    // Handled on keydown: preventing it stops the browser's own close request, which a `cancel`
-    // listener cannot reliably veto.
+    // Escape closes just the form while it is open, the whole dialog otherwise. Handled on keydown:
+    // preventing it stops the browser's own close request, which a `cancel` listener cannot reliably veto.
     dialog.addEventListener('keydown', (ev) => {
         if (ev.key === 'Escape' && !form.hidden) {
             ev.preventDefault();
@@ -221,32 +344,49 @@ export function createHistory({ getStore, isSignedIn, signIn, getLiveId, getLive
             dialog.close();
             return;
         }
-        const button = ev.target.closest('button');
-        if (!button) return;
-        if (button.dataset.ask) {
-            confirmId = button.dataset.ask;
+        const target = ev.target.closest('button');
+        if (!target) return;
+        const data = target.dataset;
+        if (data.ask) {
+            state.confirmId = data.ask;
             render();
-        } else if (button.dataset.deleteCancel) {
-            confirmId = null;
+        } else if (data.deleteCancel) {
+            state.confirmId = null;
             render();
-        } else if (button.dataset.delete) {
-            confirmId = null;
+        } else if (data.delete) {
+            state.confirmId = null;
             try {
-                await getStore().deleteSession(button.dataset.delete);
+                await getStore().deleteSession(data.delete);
             } catch (err) {
                 console.error('Delete failed:', err);
             }
             render();
-        } else if (button.dataset.retry) {
+        } else if (data.retry) {
             startWatching();
-        } else if (button.dataset.signin) {
+        } else if (data.signin) {
             await signIn();
+        } else if (data.monthStep) {
+            state.month = addMonths(state.month, Number(data.monthStep));
+            state.selected = null;
+            watchMonth();
+            render();
+        } else if (data.day) {
+            // Today is already listed in full at the top, so its cell scrolls there instead of repeating it.
+            if (data.day === dayKey(Date.now())) {
+                body.scrollTo({ top: 0, behavior: 'smooth' });
+            } else {
+                state.selected = state.selected === data.day ? null : data.day;
+                render();
+                if (state.selected) $('day-detail')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            }
+        } else if (data.addForDay) {
+            openEntryForm(data.addForDay);
         }
     });
 
     $('history-close').addEventListener('click', () => dialog.close());
     addButton.addEventListener('click', () => {
-        if (form.hidden) openEntryForm();
+        if (form.hidden) openEntryForm(state.selected);
         else form.hidden = true;
     });
 
@@ -276,9 +416,10 @@ export function createHistory({ getStore, isSignedIn, signIn, getLiveId, getLive
         return session;
     }
 
-    function openEntryForm() {
+    /** `forDay` (a dayKey) pre-fills the date when she opens the form from a picked calendar day. */
+    function openEntryForm(forDay) {
         const today = dayKey(Date.now());
-        fields.date.value = today;
+        fields.date.value = forDay && forDay <= today ? forDay : today;
         fields.date.max = today;
         fields.start.value = '';
         fields.stop.value = '';

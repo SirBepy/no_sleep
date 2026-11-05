@@ -33,25 +33,16 @@
             </div>
         </div>
 
-        <div class="info-button tooltip-trigger" id="info-button">
-            <i class="ph ph-info" style="font-size: 20px;"></i>
-            <div class="tooltip tooltip-right">
-                <p>Keep this tab open and visible to prevent your PC from sleeping.</p>
-            </div>
-        </div>
-
         <h1>No Sleep</h1>
 
         <div class="timer">
-            <span class="time-slot">
-                <span id="time" class="time-display" role="button" tabindex="0" title="Click to edit"></span>
-                <input id="time-input" class="time-input" type="text" inputmode="numeric" autocomplete="off"
-                    aria-label="Elapsed time, hours:minutes:seconds" hidden>
-                <button id="time-cancel" class="time-cancel" type="button" aria-label="Cancel edit" hidden><i
-                        class="ph ph-x"></i></button>
+            <span class="time-wrap">
+            <span class="time-slot" id="time" role="group" aria-label="Elapsed time. Click hours, minutes or seconds to edit.">
+                <span class="seg"><span class="seg-text" data-unit="h" role="button" tabindex="0" title="Edit hours">00</span><input class="seg-input" data-unit="h" type="text" inputmode="numeric" autocomplete="off" maxlength="3" aria-label="Hours" hidden></span><span class="colon">:</span><span class="seg"><span class="seg-text" data-unit="m" role="button" tabindex="0" title="Edit minutes">00</span><input class="seg-input" data-unit="m" type="text" inputmode="numeric" autocomplete="off" maxlength="2" aria-label="Minutes" hidden></span><span class="colon">:</span><span class="seg"><span class="seg-text" data-unit="s" role="button" tabindex="0" title="Edit seconds">00</span><input class="seg-input" data-unit="s" type="text" inputmode="numeric" autocomplete="off" maxlength="2" aria-label="Seconds" hidden></span>
             </span>
-            <div class="time-error" id="time-error" role="alert"></div>
-            <div class="running-for">running for</div>
+            <button id="time-cancel" class="time-cancel" type="button" aria-label="Cancel edit" hidden><i
+                    class="ph ph-x"></i></button>
+            </span>
         </div>
 
         <button class="pause-toggle" id="pause-toggle">
@@ -76,7 +67,6 @@
                         class="ph ph-x"></i></button>
             </div>
         </div>
-        <div class="history-summary">Last 30 days<b id="history-total">-</b></div>
         <form class="entry-form" id="entry-form" hidden>
             <div class="form-grid">
                 <div class="field full"><label for="entry-date">Date</label><input class="input" type="date"

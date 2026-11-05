@@ -1,16 +1,23 @@
-// Run with: node --test tests/
+// Run with: node --test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
     formatHms,
-    parseHms,
+    splitHms,
+    replaceUnit,
+    UNIT_MAX,
     formatDuration,
     dayKey,
     dayLabel,
-    cutoffMs,
-    groupByDay,
+    startOfDay,
     totalMs,
+    totalsByDay,
     sessionDurationMs,
+    monthOf,
+    addMonths,
+    monthRange,
+    monthGrid,
+    shadeLevel,
     buildManualEntry,
     startedAtForElapsed,
 } from '../src/scripts/sessions.js';
@@ -25,13 +32,16 @@ test('formatHms pads and handles hours over 99', () => {
     assert.equal(formatHms(-5), '00:00:00');
 });
 
-test('parseHms accepts hh:mm:ss and rejects everything else', () => {
-    assert.equal(parseHms('01:30:00'), 90 * 60 * 1000);
-    assert.equal(parseHms(' 1:5:9 '), (3600 + 5 * 60 + 9) * 1000);
-    assert.equal(parseHms('00:60:00'), null);
-    assert.equal(parseHms('12:34'), null);
-    assert.equal(parseHms('abc'), null);
-    assert.equal(parseHms(''), null);
+test('splitHms and replaceUnit change one field and keep the other two', () => {
+    const ms = (3 * 3600 + 25 * 60 + 40) * 1000;
+    assert.deepEqual(splitHms(ms), { h: 3, m: 25, s: 40 });
+    assert.equal(replaceUnit(ms, 'h', 1), (1 * 3600 + 25 * 60 + 40) * 1000);
+    assert.equal(replaceUnit(ms, 'm', 59), (3 * 3600 + 59 * 60 + 40) * 1000);
+    assert.equal(replaceUnit(ms, 's', 0), (3 * 3600 + 25 * 60) * 1000);
+});
+
+test('minutes and seconds top out at 59, hours at 999', () => {
+    assert.deepEqual(UNIT_MAX, { h: 999, m: 59, s: 59 });
 });
 
 test('formatDuration drops seconds, pads minutes and omits a zero hour', () => {
@@ -47,25 +57,55 @@ test('dayLabel names today and yesterday, otherwise a short date', () => {
     assert.match(dayLabel('2026-10-27', NOW), /Oct/);
 });
 
-test('cutoffMs is local midnight 30 days back', () => {
-    assert.equal(cutoffMs(NOW), at(2026, 10, 6));
-});
-
-test('groupByDay orders days and sessions newest first with per-day totals', () => {
-    const groups = groupByDay([
-        { id: 'a', startedAt: at(2026, 11, 4, 9), activeMs: 3600000 },
-        { id: 'b', startedAt: at(2026, 11, 5, 9), activeMs: 1800000 },
-        { id: 'c', startedAt: at(2026, 11, 4, 13), activeMs: 7200000 },
-    ]);
-    assert.deepEqual(groups.map((g) => g.key), ['2026-11-05', '2026-11-04']);
-    assert.deepEqual(groups[1].sessions.map((s) => s.id), ['c', 'a']);
-    assert.equal(groups[1].totalMs, 3 * 3600000);
+test('startOfDay is local midnight', () => {
+    assert.equal(startOfDay(NOW), at(2026, 11, 5));
 });
 
 test('sessionDurationMs falls back to the time range when activeMs is missing', () => {
     assert.equal(sessionDurationMs({ startedAt: 1000, endedAt: 61000 }), 60000);
     assert.equal(sessionDurationMs({ startedAt: 1000, endedAt: 61000, activeMs: 5000 }), 5000);
     assert.equal(totalMs([{ startedAt: 0, activeMs: 10 }, { startedAt: 0, activeMs: 5 }]), 15);
+});
+
+test('totalsByDay sums per local day', () => {
+    const totals = totalsByDay([
+        { startedAt: at(2026, 11, 4, 9), activeMs: 3600000 },
+        { startedAt: at(2026, 11, 4, 13), activeMs: 7200000 },
+        { startedAt: at(2026, 11, 5, 9), activeMs: 1800000 },
+    ]);
+    assert.equal(totals.get('2026-11-04'), 3 * 3600000);
+    assert.equal(totals.get('2026-11-05'), 1800000);
+    assert.equal(totals.get('2026-11-06'), undefined);
+});
+
+test('month cursor moves across year boundaries and gives a half-open range', () => {
+    assert.deepEqual(monthOf(NOW), { year: 2026, month: 10 });
+    assert.deepEqual(addMonths({ year: 2026, month: 0 }, -1), { year: 2025, month: 11 });
+    assert.deepEqual(addMonths({ year: 2026, month: 11 }, 1), { year: 2027, month: 0 });
+    const { since, until } = monthRange({ year: 2026, month: 10 });
+    assert.equal(since, at(2026, 11, 1));
+    assert.equal(until, at(2026, 12, 1));
+});
+
+test('monthGrid is whole Monday-first weeks padded with nulls', () => {
+    // November 2026 starts on a Sunday, so Monday-first needs 6 blanks before the 1st.
+    const nov = monthGrid({ year: 2026, month: 10 });
+    assert.equal(nov.length % 7, 0);
+    assert.equal(nov.slice(0, 6).every((c) => c === null), true);
+    assert.equal(nov[6], '2026-11-01');
+    assert.equal(nov.filter(Boolean).length, 30);
+    // February 2027 starts on a Monday and has 28 days: exactly four full rows, no padding.
+    const feb = monthGrid({ year: 2027, month: 1 });
+    assert.equal(feb.length, 28);
+    assert.equal(feb[0], '2027-02-01');
+});
+
+test('shadeLevel scales a day against the busiest one', () => {
+    assert.equal(shadeLevel(0, 100), 0);
+    assert.equal(shadeLevel(100, 0), 0);
+    assert.equal(shadeLevel(100, 100), 38);
+    assert.equal(shadeLevel(1, 100), 10);
+    assert.ok(shadeLevel(50, 100) > 10 && shadeLevel(50, 100) < 38);
 });
 
 test('buildManualEntry builds a manual session', () => {

@@ -52,9 +52,15 @@ export function deleteSession(id) {
     return deleteDoc(doc(sessionsCol(), id));
 }
 
-/** Live list of sessions started at or after `sinceMs`, newest first. Returns the unsubscribe function. */
-export function watchSessions(sinceMs, onRows, onError) {
-    const q = query(sessionsCol(), where('startedAt', '>=', sinceMs), orderBy('startedAt', 'desc'));
+/**
+ * Live list of sessions that started in [since, until) (until optional), newest first. Returns the
+ * unsubscribe function. Both bounds are on startedAt, the same field as the sort, so no composite
+ * index is needed.
+ */
+export function watchSessions({ since, until }, onRows, onError) {
+    const bounds = [where('startedAt', '>=', since)];
+    if (until !== undefined) bounds.push(where('startedAt', '<', until));
+    const q = query(sessionsCol(), ...bounds, orderBy('startedAt', 'desc'));
     return onSnapshot(
         q,
         (snapshot) => onRows(snapshot.docs.map((d) => ({ id: d.id, ...d.data() }))),

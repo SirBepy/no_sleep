@@ -1,4 +1,4 @@
-import { formatHms, parseHms, startedAtForElapsed } from './sessions.js';
+import { replaceUnit, splitHms, startedAtForElapsed, UNIT_MAX } from './sessions.js';
 import { createHistory } from './history.js';
 
 const SAVE_INTERVAL_MS = 30000;
@@ -21,7 +21,7 @@ let session = null;
 // Firebase store module and signed-in user; both stay null when signed out or the SDK failed to load.
 let store = null;
 let user = null;
-let editingTime = false;
+let editingUnit = null;
 
 function ensureAudioContext() {
     if (audioCtx) return;
@@ -146,12 +146,19 @@ function saveSessionNow() {
     }).catch((err) => console.error('Session save failed:', err));
 }
 
+const pad2 = (n) => String(n).padStart(2, '0');
+
 function renderTimer() {
     const timerElement = document.getElementById('time');
     if (!timerElement) return;
 
     persistSession();
-    if (!editingTime) timerElement.textContent = formatHms(currentElapsed());
+    const parts = splitHms(currentElapsed());
+    for (const unit of ['h', 'm', 's']) {
+        // The field being typed in keeps its input; the other two keep ticking.
+        if (unit === editingUnit) continue;
+        timerElement.querySelector(`.seg-text[data-unit="${unit}"]`).textContent = pad2(parts[unit]);
+    }
 }
 
 function updateTimer() {
@@ -167,68 +174,69 @@ function setElapsed(ms) {
     saveSessionNow();
 }
 
-function showTimeError(message) {
-    const box = document.getElementById('time-error');
-    if (!box) return;
-    box.textContent = message;
-    if (message) setTimeout(() => { if (box.textContent === message) box.textContent = ''; }, 3000);
-}
-
+// Hours, minutes and seconds are edited one field at a time: click the part to change, type, click away.
 function setupTimeEditing() {
-    const display = document.getElementById('time');
-    const input = document.getElementById('time-input');
+    const timerElement = document.getElementById('time');
     const cancel = document.getElementById('time-cancel');
-    if (!display || !input || !cancel) return;
+    if (!timerElement || !cancel) return;
+    const textOf = (unit) => timerElement.querySelector(`.seg-text[data-unit="${unit}"]`);
+    const inputOf = (unit) => timerElement.querySelector(`.seg-input[data-unit="${unit}"]`);
 
-    function begin() {
-        if (editingTime) return;
-        editingTime = true;
-        input.value = formatHms(currentElapsed());
-        input.style.width = `${input.value.length + 1}ch`;
-        display.hidden = true;
+    function begin(unit) {
+        if (editingUnit === unit) return;
+        editingUnit = unit;
+        const input = inputOf(unit);
+        input.value = String(splitHms(currentElapsed())[unit]);
+        input.dataset.last = input.value;
+        textOf(unit).hidden = true;
         input.hidden = false;
         cancel.hidden = false;
-        showTimeError('');
         input.focus();
         input.select();
     }
 
     function finish() {
-        editingTime = false;
-        input.hidden = true;
+        const unit = editingUnit;
+        if (!unit) return;
+        editingUnit = null;
+        inputOf(unit).hidden = true;
+        textOf(unit).hidden = false;
         cancel.hidden = true;
-        display.hidden = false;
         renderTimer();
     }
 
-    // Click-away commits; an unparseable value is dropped rather than trapping her in the field.
-    function commit(keepOpenOnError) {
-        const ms = parseHms(input.value);
-        if (ms === null) {
-            showTimeError('Use hours:minutes:seconds, e.g. 01:30:00');
-            if (!keepOpenOnError) finish();
-            return;
-        }
+    // Click-away commits. An emptied field means "no change" rather than zero, so a stray click never wipes a value.
+    function commit() {
+        const unit = editingUnit;
+        const typed = inputOf(unit).value;
         finish();
-        setElapsed(ms);
+        if (typed === '') return;
+        setElapsed(replaceUnit(currentElapsed(), unit, Number(typed)));
     }
 
-    display.addEventListener('click', begin);
-    display.addEventListener('keydown', (ev) => {
-        if (ev.key === 'Enter' || ev.key === ' ') {
-            ev.preventDefault();
-            begin();
-        }
-    });
-    input.addEventListener('input', () => {
-        input.style.width = `${Math.max(input.value.length, 8) + 1}ch`;
-        showTimeError('');
-    });
-    input.addEventListener('keydown', (ev) => {
-        if (ev.key === 'Enter') commit(true);
-        else if (ev.key === 'Escape') finish();
-    });
-    input.addEventListener('blur', () => { if (editingTime) commit(false); });
+    for (const unit of ['h', 'm', 's']) {
+        const text = textOf(unit);
+        const input = inputOf(unit);
+        text.addEventListener('click', () => begin(unit));
+        text.addEventListener('keydown', (ev) => {
+            if (ev.key === 'Enter' || ev.key === ' ') {
+                ev.preventDefault();
+                begin(unit);
+            }
+        });
+        // Digits only, and a value past the field's maximum (60 or more for minutes and seconds) is refused.
+        input.addEventListener('input', () => {
+            const digits = input.value.replace(/\D/g, '');
+            const ok = digits === '' || Number(digits) <= UNIT_MAX[unit];
+            input.value = ok ? digits : input.dataset.last;
+            input.dataset.last = input.value;
+        });
+        input.addEventListener('keydown', (ev) => {
+            if (ev.key === 'Enter') commit();
+            else if (ev.key === 'Escape') finish();
+        });
+        input.addEventListener('blur', () => { if (editingUnit === unit) commit(); });
+    }
     // mousedown fires before the input's blur, so preventing it stops blur from committing a cancelled edit.
     cancel.addEventListener('mousedown', (ev) => ev.preventDefault());
     cancel.addEventListener('click', finish);
@@ -270,7 +278,8 @@ function renderAccount() {
     button.replaceChildren();
     if (user) {
         const avatar = document.createElement('span');
-        avatar.className = 'avatar';
+        // Not 'avatar': the shared styleguide styles that class with its own border and shadow ring.
+        avatar.className = 'account-initial';
         avatar.textContent = (user.displayName || user.email || '?').trim().charAt(0).toUpperCase();
         button.append(avatar);
         button.title = 'Account';
