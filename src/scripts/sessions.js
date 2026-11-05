@@ -1,22 +1,24 @@
 // Pure session logic: no DOM, no Firebase. Kept dependency-free so `node --test` can load it.
 
-export const HISTORY_DAYS = 30;
-
 const pad2 = (n) => String(n).padStart(2, '0');
 
 export function formatHms(ms) {
-    const total = Math.max(0, Math.floor(ms / 1000));
-    const h = Math.floor(total / 3600);
-    const m = Math.floor((total % 3600) / 60);
-    const s = total % 60;
+    const { h, m, s } = splitHms(ms);
     return `${pad2(h)}:${pad2(m)}:${pad2(s)}`;
 }
 
-/** "H:MM:SS" (also "HH:MM:SS", hours up to 999) to milliseconds, or null when malformed. */
-export function parseHms(text) {
-    const match = /^(\d{1,3}):([0-5]?\d):([0-5]?\d)$/.exec(String(text).trim());
-    if (!match) return null;
-    return ((+match[1]) * 3600 + (+match[2]) * 60 + (+match[3])) * 1000;
+export function splitHms(ms) {
+    const total = Math.max(0, Math.floor(ms / 1000));
+    return { h: Math.floor(total / 3600), m: Math.floor((total % 3600) / 60), s: total % 60 };
+}
+
+/** Largest value each timer field accepts: minutes and seconds stop at 59, hours at 999. */
+export const UNIT_MAX = { h: 999, m: 59, s: 59 };
+
+/** The elapsed time with one field (h, m or s) replaced and the other two kept as they are. */
+export function replaceUnit(ms, unit, value) {
+    const parts = { ...splitHms(ms), [unit]: value };
+    return (parts.h * 3600 + parts.m * 60 + parts.s) * 1000;
 }
 
 /** "9m" under an hour, "3h 05m" above: a leading "0h" is noise on short sessions. */
@@ -43,14 +45,13 @@ export function dayLabel(key, nowMs) {
     yesterday.setDate(yesterday.getDate() - 1);
     if (key === dayKey(yesterday.getTime())) return 'Yesterday';
     const [y, m, d] = key.split('-').map(Number);
-    return new Date(y, m - 1, d).toLocaleDateString('en', { weekday: 'short', month: 'short', day: 'numeric' });
+    return new Date(y, m - 1, d).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
-/** Start of the local day `days` days before `nowMs`: the history window's lower bound. */
-export function cutoffMs(nowMs, days = HISTORY_DAYS) {
-    const d = new Date(nowMs);
+/** Start of the local day containing `ms`. */
+export function startOfDay(ms) {
+    const d = new Date(ms);
     d.setHours(0, 0, 0, 0);
-    d.setDate(d.getDate() - days);
     return d.getTime();
 }
 
@@ -60,24 +61,53 @@ export function sessionDurationMs(session) {
     return Math.max(0, (session.endedAt ?? session.startedAt) - session.startedAt);
 }
 
-/** Newest day first, newest session first inside a day, each day carrying its total. */
-export function groupByDay(sessions) {
-    const groups = new Map();
-    for (const session of sessions) {
-        const key = dayKey(session.startedAt);
-        if (!groups.has(key)) groups.set(key, []);
-        groups.get(key).push(session);
-    }
-    return [...groups.entries()]
-        .sort((a, b) => b[0].localeCompare(a[0]))
-        .map(([key, list]) => {
-            list.sort((a, b) => b.startedAt - a.startedAt);
-            return { key, sessions: list, totalMs: list.reduce((sum, s) => sum + sessionDurationMs(s), 0) };
-        });
-}
-
 export function totalMs(sessions) {
     return sessions.reduce((sum, s) => sum + sessionDurationMs(s), 0);
+}
+
+/** Total counted time per local day, keyed by dayKey. */
+export function totalsByDay(sessions) {
+    const totals = new Map();
+    for (const session of sessions) {
+        const key = dayKey(session.startedAt);
+        totals.set(key, (totals.get(key) || 0) + sessionDurationMs(session));
+    }
+    return totals;
+}
+
+/** Month cursor for the calendar: month is 0-11. */
+export function monthOf(ms) {
+    const d = new Date(ms);
+    return { year: d.getFullYear(), month: d.getMonth() };
+}
+
+export function addMonths({ year, month }, delta) {
+    const d = new Date(year, month + delta, 1);
+    return { year: d.getFullYear(), month: d.getMonth() };
+}
+
+/** [start, end) of a month as epoch ms, the range the calendar subscribes to. */
+export function monthRange({ year, month }) {
+    return { since: new Date(year, month, 1).getTime(), until: new Date(year, month + 1, 1).getTime() };
+}
+
+/**
+ * Calendar cells for one month, Monday first: a dayKey per day, null for the blanks that pad
+ * the first and last week so the grid is always whole rows of seven.
+ */
+export function monthGrid({ year, month }) {
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const leading = (new Date(year, month, 1).getDay() + 6) % 7;
+    const cells = Array(leading).fill(null);
+    for (let day = 1; day <= daysInMonth; day++) cells.push(`${year}-${pad2(month + 1)}-${pad2(day)}`);
+    while (cells.length % 7 !== 0) cells.push(null);
+    return cells;
+}
+
+/** 0 for an empty day, otherwise 10-38: a tint strength scaled to the busiest day shown. */
+export function shadeLevel(dayMs, maxMs) {
+    if (!dayMs || !maxMs) return 0;
+    return 10 + Math.round(28 * Math.min(1, dayMs / maxMs));
 }
 
 /**

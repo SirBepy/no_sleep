@@ -33,35 +33,23 @@ h1 {
   font-family: var(--font-heading);
 }
 
-.info-button {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  cursor: pointer;
-  color: var(--color-text-muted);
-  transition: color 0.2s ease;
-  z-index: 10;
-}
-
-.info-button:hover {
-  color: var(--color-text);
-}
-
+/* Kept modest on purpose: a huge counter feels like a deadline. */
 .timer {
-  margin: 2rem 0 1.75rem;
+  --time-size: clamp(1.9rem, 8vw, 2.4rem);
+  margin: 1.75rem 0 1.5rem;
 }
 
-.timer .running-for {
-  margin-top: 4px;
-  font-size: 0.8rem;
-  font-weight: 400;
-  color: var(--color-text-muted);
+.time-wrap {
+  position: relative;
+  display: inline-block;
 }
 
 .timer #time {
-  font-size: clamp(2.75rem, 13vw, 4rem);
+  display: inline-flex;
+  align-items: baseline;
+  font-size: var(--time-size);
   font-weight: 500;
-  line-height: 1.1;
+  line-height: 1.2;
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
@@ -125,7 +113,7 @@ h1 {
 }
 
 /* One focus ring for every control this page draws itself; the styleguide's .btn keeps its own. */
-.time-display:focus-visible,
+.seg-text:focus-visible,
 .pause-toggle:focus-visible,
 .account-btn:focus-visible,
 .account-menu button:focus-visible,
@@ -165,7 +153,7 @@ h1 {
   opacity: 1;
 }
 
-.avatar {
+.account-initial {
   width: 22px;
   height: 22px;
   border-radius: 50%;
@@ -214,17 +202,19 @@ h1 {
 }
 
 /* ---- Editable timer ---- */
-.time-slot {
+.seg {
   display: inline-flex;
-  align-items: center;
-  gap: 4px;
 }
 
-/* A dotted underline says "this is editable" without adding an icon. */
-.timer .time-display {
+.colon {
+  color: var(--color-text-muted);
+}
+
+/* A dotted underline says "this part is editable" without adding an icon. */
+.seg-text {
   cursor: text;
   border-radius: 6px;
-  padding: 0 6px;
+  padding: 0 2px;
   text-decoration: underline dotted;
   text-decoration-color: var(--color-border);
   text-decoration-thickness: 2px;
@@ -232,17 +222,23 @@ h1 {
   transition: text-decoration-color 0.2s ease;
 }
 
-.timer .time-display:hover,
-.timer .time-display:focus-visible {
+.seg-text:hover,
+.seg-text:focus-visible {
   text-decoration-color: var(--color-primary);
 }
 
-/* Width is set from JS in ch so the field always fits "HHH:MM:SS" without clipping. */
-.time-input {
-  font-size: clamp(2.75rem, 13vw, 4rem);
-  line-height: 1.1;
-  font-family: var(--font-mono);
-  font-weight: 500;
+.seg-text[hidden],
+.seg-input[hidden],
+.time-cancel[hidden] {
+  display: none;
+}
+
+/* Sized in ch to the field's digit limit so the number is never clipped. */
+.seg-input {
+  font-size: inherit;
+  line-height: inherit;
+  font-family: inherit;
+  font-weight: inherit;
   font-variant-numeric: tabular-nums;
   color: var(--color-text);
   text-align: center;
@@ -255,18 +251,23 @@ h1 {
   box-sizing: content-box;
 }
 
-.time-input[hidden],
-.time-cancel[hidden],
-.time-display[hidden] {
-  display: none;
+.seg-input[maxlength="2"] {
+  width: 2ch;
+}
+
+.seg-input[maxlength="3"] {
+  width: 3ch;
 }
 
 .time-cancel {
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  translate: 4px -50%;
   display: flex;
   background: none;
   border: none;
   padding: 10px;
-  margin: -10px;
   font-size: 1.1rem;
   border-radius: 50%;
   color: var(--color-text-muted);
@@ -275,13 +276,6 @@ h1 {
 
 .time-cancel:hover {
   color: var(--color-text);
-}
-
-.time-error {
-  min-height: 1.2em;
-  margin-top: 4px;
-  font-size: 0.75rem;
-  color: var(--color-danger, #e05252);
 }
 
 /* ---- History button ---- */
@@ -345,24 +339,6 @@ h1 {
 .history-head-actions .btn {
   min-height: 40px;
   justify-content: center;
-}
-
-/* The 30-day total is the one number she reads first, so it leads. */
-.history-summary {
-  padding: 0 18px 10px;
-  font-size: 0.8rem;
-  color: var(--color-text-muted);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.history-summary b {
-  display: block;
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-size: 1.6rem;
-  font-weight: 600;
-  line-height: 1.2;
-  color: var(--color-text);
 }
 
 .history-body {
@@ -497,19 +473,6 @@ h1 {
   border-color: var(--color-danger, #e05252);
 }
 
-.history-empty {
-  padding: 28px 12px;
-  text-align: center;
-  font-size: 0.85rem;
-  color: var(--color-text-muted);
-}
-
-.history-empty p {
-  margin: 0;
-  font-size: inherit;
-  color: inherit;
-}
-
 .history-signin {
   padding: 36px 12px;
   text-align: center;
@@ -521,6 +484,126 @@ h1 {
   margin: 0 0 14px;
   font-size: inherit;
   color: inherit;
+}
+
+.history-hint {
+  margin: 10px 0 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+/* ---- Month calendar ---- */
+.calendar {
+  margin-top: 22px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border);
+}
+
+.cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cal-title {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--color-text);
+}
+
+.cal-nav {
+  display: flex;
+  padding: 10px;
+  font-size: 1rem;
+  background: none;
+  border: none;
+  border-radius: 50%;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.cal-nav:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.cal-nav:focus-visible,
+.cal-day:focus-visible,
+.detail-add:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.cal-total {
+  margin: -4px 0 8px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.cal-dow {
+  text-align: center;
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+}
+
+.cal-day {
+  --shade: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 48px;
+  padding: 4px 1px;
+  font: inherit;
+  color: var(--color-text);
+  /* Tint strength scales with the day's hours; capped so text stays readable in light and dark themes. */
+  background: color-mix(in srgb, var(--color-primary) calc(var(--shade) * 1%), transparent);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.cal-day:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.cal-day.is-today {
+  border-color: var(--color-primary);
+}
+
+.cal-day.is-selected {
+  border: 2px solid var(--color-primary);
+  padding: 3px 0;
+}
+
+.cal-num {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.cal-hours {
+  min-height: 1em;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.62rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.day-detail {
+  margin-top: 6px;
+}
+
+.detail-add {
+  margin-top: 10px;
 }
 
 .history-error {
