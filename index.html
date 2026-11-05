@@ -60,14 +60,19 @@
     <dialog class="history-dialog card" id="history-dialog" aria-labelledby="history-title">
         <div class="history-head">
             <h2 id="history-title">History</h2>
-            <div class="history-head-actions">
-                <button class="btn btn-primary btn-sm" id="history-add" type="button"><i class="ph ph-plus"></i> Add
-                    entry</button>
-                <button class="btn btn-ghost btn-sm" id="history-close" type="button" aria-label="Close"><i
-                        class="ph ph-x"></i></button>
-            </div>
+            <button class="btn btn-ghost btn-sm" id="history-close" type="button" aria-label="Close"><i
+                    class="ph ph-x"></i></button>
         </div>
-        <form class="entry-form" id="entry-form" hidden>
+        <div class="history-body" id="history-body"></div>
+    </dialog>
+
+    <dialog class="entry-dialog card" id="entry-dialog" aria-labelledby="entry-title">
+        <div class="history-head">
+            <h2 id="entry-title">Add entry</h2>
+            <button class="btn btn-ghost btn-sm" id="entry-close" type="button" aria-label="Close"><i
+                    class="ph ph-x"></i></button>
+        </div>
+        <form class="entry-form" id="entry-form">
             <div class="form-grid">
                 <div class="field full"><label for="entry-date">Date</label><input class="input" type="date"
                         id="entry-date" required></div>
@@ -86,7 +91,6 @@
                 </div>
             </div>
         </form>
-        <div class="history-body" id="history-body"></div>
     </dialog>
 
     <div class="footer">
