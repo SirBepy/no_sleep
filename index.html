@@ -24,6 +24,15 @@
 
 <body>
     <div class="container card">
+        <div class="account" id="account">
+            <button class="account-btn" id="account-btn" type="button" aria-label="Sign in with Google"
+                title="Sign in with Google to save your time"><i class="ph ph-user-circle"></i></button>
+            <div class="account-menu" id="account-menu" hidden>
+                <b id="account-email"></b>
+                <button type="button" id="signout-btn">Sign out</button>
+            </div>
+        </div>
+
         <div class="info-button tooltip-trigger" id="info-button">
             <i class="ph ph-info" style="font-size: 20px;"></i>
             <div class="tooltip tooltip-right">
@@ -34,7 +43,15 @@
         <h1>No Sleep</h1>
 
         <div class="timer">
-            <span class="running-for">Running for:</span> <br /><span id="time"></span>
+            <span class="running-for">Running for:</span> <br />
+            <span class="time-slot">
+                <span id="time" class="time-display" role="button" tabindex="0" title="Click to edit"></span>
+                <input id="time-input" class="time-input" type="text" inputmode="numeric" autocomplete="off"
+                    aria-label="Elapsed time, hours:minutes:seconds" hidden>
+                <button id="time-cancel" class="time-cancel" type="button" aria-label="Cancel edit" hidden><i
+                        class="ph ph-x"></i></button>
+            </span>
+            <div class="time-error" id="time-error" role="alert"></div>
         </div>
 
         <button class="pause-toggle" id="pause-toggle">
@@ -43,14 +60,55 @@
             <span>Pause</span>
         </button>
         <div class="pause-hint" id="pause-hint">Timer paused, but <b>No Sleep</b> is still keeping your PC awake.</div>
+        <div class="card-actions">
+            <button class="btn btn-ghost btn-sm" id="history-btn" type="button"><i
+                    class="ph ph-clock-counter-clockwise"></i> History</button>
+        </div>
     </div>
+
+    <dialog class="history-dialog card" id="history-dialog" aria-labelledby="history-title">
+        <div class="history-head">
+            <h2 id="history-title">History</h2>
+            <div class="history-head-actions">
+                <button class="btn btn-primary btn-sm" id="history-add" type="button"><i class="ph ph-plus"></i> Add
+                    entry</button>
+                <button class="btn btn-ghost btn-sm" id="history-close" type="button" aria-label="Close"><i
+                        class="ph ph-x"></i></button>
+            </div>
+        </div>
+        <div class="history-summary"><span>Last 30 days</span><span>Total <b id="history-total">-</b></span></div>
+        <div class="history-body" id="history-body"></div>
+    </dialog>
+
+    <dialog class="entry-dialog card" id="entry-dialog" aria-labelledby="entry-title">
+        <form id="entry-form" method="dialog">
+            <h3 id="entry-title">Add entry</h3>
+            <div class="form-grid">
+                <div class="field full"><label for="entry-date">Date</label><input class="input" type="date"
+                        id="entry-date" required></div>
+                <div class="field"><label for="entry-start">Started</label><input class="input" type="time"
+                        id="entry-start" required></div>
+                <div class="field"><label for="entry-stop">Stopped</label><input class="input" type="time"
+                        id="entry-stop" required></div>
+                <div class="field full"><label for="entry-note">Note (optional)</label><input class="input"
+                        type="text" id="entry-note" maxlength="200" placeholder="What did you work on?"></div>
+            </div>
+            <div class="form-foot">
+                <span class="entry-preview" id="entry-preview" aria-live="polite"></span>
+                <div class="form-buttons">
+                    <button class="btn btn-ghost btn-sm" id="entry-cancel" type="button">Cancel</button>
+                    <button class="btn btn-primary btn-sm" id="entry-save" type="submit">Save entry</button>
+                </div>
+            </div>
+        </form>
+    </dialog>
 
     <div class="footer">
         Keep this tab open to prevent your system from sleeping.
     </div>
 
     <script type="module" src="src/scripts/build-info.js"></script>
-    <script src="src/scripts/script.js"></script>
+    <script type="module" src="src/scripts/script.js"></script>
     <!-- Settings widget - comment out to disable -->
     <script src="https://cdn.jsdelivr.net/gh/sirbepy/sirbepy-styleguide@main/widget/settings.js"></script>
     <!-- Register custom background variant before loading background.js -->
