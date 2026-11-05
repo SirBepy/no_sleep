@@ -19,14 +19,16 @@ export function parseHms(text) {
     return ((+match[1]) * 3600 + (+match[2]) * 60 + (+match[3])) * 1000;
 }
 
+/** "9m" under an hour, "3h 05m" above: a leading "0h" is noise on short sessions. */
 export function formatDuration(ms) {
     const totalMinutes = Math.max(0, Math.floor(ms / 60000));
-    return `${Math.floor(totalMinutes / 60)}h ${pad2(totalMinutes % 60)}m`;
+    const hours = Math.floor(totalMinutes / 60);
+    return hours === 0 ? `${totalMinutes}m` : `${hours}h ${pad2(totalMinutes % 60)}m`;
 }
 
+/** Locale clock (12h or 24h to match her device) so list times read like the Add entry time fields. */
 export function clockLabel(ms) {
-    const d = new Date(ms);
-    return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+    return new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
 /** Local calendar day as YYYY-MM-DD; days are local so a late-night session stays on the day she lived it. */
@@ -91,7 +93,7 @@ export function buildManualEntry({ date, start, stop, note }, nowMs) {
     const startedAt = new Date(y, mo - 1, d, sh, sm).getTime();
     const endedAt = new Date(y, mo - 1, d, eh, em).getTime();
     if (endedAt <= startedAt) return { error: 'Stop time must be after start time' };
-    if (startedAt > nowMs) return { error: 'That time is in the future' };
+    if (endedAt > nowMs) return { error: 'That time is in the future' };
     return {
         session: {
             startedAt,

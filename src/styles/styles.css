@@ -23,10 +23,13 @@ body {
   position: relative;
 }
 
+/* The timer is the hero, so the title is a quiet label above it. */
 h1 {
-  margin-top: 0;
-  color: var(--color-text);
-  font-size: 2rem;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
   font-family: var(--font-heading);
 }
 
@@ -45,19 +48,22 @@ h1 {
 }
 
 .timer {
-  margin: 3em 0;
+  margin: 2rem 0 1.75rem;
 }
 
 .timer .running-for {
-  font-size: 1rem;
+  margin-top: 4px;
+  font-size: 0.8rem;
   font-weight: 400;
-  opacity: 0.5;
+  color: var(--color-text-muted);
 }
 
 .timer #time {
-  font-size: 1.2rem;
+  font-size: clamp(2.75rem, 13vw, 4rem);
   font-weight: 500;
+  line-height: 1.1;
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .footer {
@@ -68,13 +74,13 @@ h1 {
   font-size: 0.75rem;
   color: var(--color-text-muted);
   text-align: center;
-  opacity: 0.6;
+  opacity: 0.9;
   transition: opacity 0.3s ease;
   pointer-events: none;
 }
 
 .footer:hover {
-  opacity: 0.9;
+  opacity: 1;
 }
 
 .pause-toggle {
@@ -88,19 +94,17 @@ h1 {
   font-size: 0.8rem;
   padding: 6px 12px;
   border-radius: var(--radius-badge);
-  opacity: 0.4;
-  transition: opacity 0.2s ease;
+  transition: color 0.2s ease;
 }
 
 .pause-toggle:hover {
-  opacity: 0.8;
+  color: var(--color-text);
 }
 
 .pause-hint {
   display: none;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   color: var(--color-text-muted);
-  opacity: 0.5;
   margin-top: 4px;
 }
 
@@ -120,6 +124,18 @@ h1 {
   display: inline;
 }
 
+/* One focus ring for every control this page draws itself; the styleguide's .btn keeps its own. */
+.time-display:focus-visible,
+.pause-toggle:focus-visible,
+.account-btn:focus-visible,
+.account-menu button:focus-visible,
+.time-cancel:focus-visible,
+.entry-delete:focus-visible,
+.entry-confirm button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 /* ---- Account (top-left, mirrors the info button) ---- */
 .account {
   position: absolute;
@@ -133,19 +149,20 @@ h1 {
   padding: 0;
   background: none;
   border: none;
+  border-radius: 50%;
   font-size: 20px;
   line-height: 1;
   color: var(--color-text-muted);
   cursor: pointer;
-  /* Faint on purpose: sign-in is a one-time chore, not a call to action. */
-  opacity: 0.35;
+  /* Quiet on purpose, but kept at icon contrast (3:1+): sign-in is a one-time chore, not a call to action. */
+  opacity: 0.75;
   transition: opacity 0.2s ease;
 }
 
 .account-btn:hover,
 .account-btn:focus-visible,
 .account-btn.signed-in {
-  opacity: 0.8;
+  opacity: 1;
 }
 
 .avatar {
@@ -203,31 +220,37 @@ h1 {
   gap: 4px;
 }
 
+/* A dotted underline says "this is editable" without adding an icon. */
 .timer .time-display {
   cursor: text;
   border-radius: 6px;
-  padding: 2px 6px;
-  transition: background 0.2s ease;
+  padding: 0 6px;
+  text-decoration: underline dotted;
+  text-decoration-color: var(--color-border);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.18em;
+  transition: text-decoration-color 0.2s ease;
 }
 
 .timer .time-display:hover,
 .timer .time-display:focus-visible {
-  background: rgba(255, 255, 255, 0.06);
+  text-decoration-color: var(--color-primary);
 }
 
 /* Width is set from JS in ch so the field always fits "HHH:MM:SS" without clipping. */
 .time-input {
-  font: inherit;
-  font-size: 1.2rem;
+  font-size: clamp(2.75rem, 13vw, 4rem);
+  line-height: 1.1;
   font-family: var(--font-mono);
   font-weight: 500;
+  font-variant-numeric: tabular-nums;
   color: var(--color-text);
   text-align: center;
   background: none;
   border: none;
-  border-bottom: 1px solid var(--color-primary);
+  border-bottom: 2px solid var(--color-primary);
   border-radius: 0;
-  padding: 2px 0;
+  padding: 0;
   outline: none;
   box-sizing: content-box;
 }
@@ -242,20 +265,22 @@ h1 {
   display: flex;
   background: none;
   border: none;
-  padding: 2px;
+  padding: 10px;
+  margin: -10px;
+  font-size: 1.1rem;
+  border-radius: 50%;
   color: var(--color-text-muted);
   cursor: pointer;
-  opacity: 0.6;
 }
 
 .time-cancel:hover {
-  opacity: 1;
+  color: var(--color-text);
 }
 
 .time-error {
-  min-height: 1em;
+  min-height: 1.2em;
   margin-top: 4px;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--color-danger, #e05252);
 }
 
@@ -269,23 +294,25 @@ h1 {
 .btn-sm {
   padding: 0.4rem 0.9rem;
   font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+/* .btn sets display, which would otherwise beat the hidden attribute. */
+.btn[hidden] {
+  display: none;
 }
 
 /* ---- Dialogs ----
    The styleguide reset zeroes every margin, which also removes <dialog>'s
    built-in auto margins, so centering is restated here. */
-.history-dialog,
-.entry-dialog {
+.history-dialog {
   margin: auto;
   padding: 0;
   max-width: 520px;
   width: calc(100% - 2rem);
+  max-height: min(680px, calc(100vh - 2rem));
   color: var(--color-text);
   text-align: left;
-}
-
-.history-dialog {
-  height: min(680px, calc(100vh - 2rem));
 }
 
 .history-dialog[open] {
@@ -293,8 +320,7 @@ h1 {
   flex-direction: column;
 }
 
-.history-dialog::backdrop,
-.entry-dialog::backdrop {
+.history-dialog::backdrop {
   background: rgba(0, 0, 0, 0.5);
 }
 
@@ -302,7 +328,7 @@ h1 {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 18px 8px;
+  padding: 16px 18px 4px;
 }
 
 .history-head h2 {
@@ -316,76 +342,97 @@ h1 {
   gap: 6px;
 }
 
+.history-head-actions .btn {
+  min-height: 40px;
+  justify-content: center;
+}
+
+/* The 30-day total is the one number she reads first, so it leads. */
 .history-summary {
-  display: flex;
-  justify-content: space-between;
   padding: 0 18px 10px;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   color: var(--color-text-muted);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .history-summary b {
+  display: block;
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 1.6rem;
+  font-weight: 600;
+  line-height: 1.2;
   color: var(--color-text);
 }
 
 .history-body {
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: auto;
   padding: 0 18px 18px;
 }
 
 .day {
-  margin-top: 12px;
+  margin-top: 14px;
 }
 
 .day-head {
   display: flex;
   justify-content: space-between;
+  align-items: baseline;
   padding-bottom: 4px;
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
+  font-size: 0.8rem;
+  font-weight: 600;
   color: var(--color-text-muted);
   border-bottom: 1px solid var(--color-border);
 }
 
 .day-head b {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 1rem;
+  font-weight: 600;
   color: var(--color-text);
-  text-transform: none;
-  letter-spacing: 0;
 }
 
 .entry {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 2px;
-  font-size: 0.85rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  min-height: 48px;
+  padding: 6px 2px;
+  font-size: 0.9rem;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .entry-main {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  flex: 1;
 }
 
 .entry-range {
-  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
 }
 
+/* One line so every row keeps the same height; the full text is in the title attribute. */
 .entry-note {
-  font-size: 0.75rem;
-  color: var(--color-text-muted);
-  overflow-wrap: anywhere;
+  font-size: 0.8rem;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .entry-duration {
-  margin-left: auto;
   font-family: var(--font-mono);
-  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--color-text);
 }
 
 .badge-sm {
@@ -396,6 +443,7 @@ h1 {
 .live-dot {
   width: 7px;
   height: 7px;
+  flex: none;
   border-radius: 50%;
   background: var(--color-success);
   animation: blink 1.4s infinite;
@@ -407,19 +455,21 @@ h1 {
   }
 }
 
+/* The hit area is padded out to ~40px; the negative margin keeps the row layout unchanged. */
 .entry-delete {
   display: flex;
-  padding: 4px;
+  padding: 12px;
+  margin: -8px -10px -8px -6px;
+  font-size: 1rem;
   background: none;
   border: none;
+  border-radius: 50%;
   color: var(--color-text-muted);
   cursor: pointer;
-  opacity: 0.5;
 }
 
 .entry-delete:hover,
 .entry-delete:focus-visible {
-  opacity: 1;
   color: var(--color-danger, #e05252);
 }
 
@@ -427,12 +477,14 @@ h1 {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.72rem;
+  font-size: 0.8rem;
+  white-space: nowrap;
 }
 
 .entry-confirm button {
-  padding: 3px 8px;
-  font: 600 0.7rem var(--font-body);
+  min-height: 36px;
+  padding: 4px 12px;
+  font: 600 0.8rem var(--font-body);
   color: var(--color-text);
   background: none;
   border: 1px solid var(--color-border);
@@ -446,21 +498,27 @@ h1 {
 }
 
 .history-empty {
-  padding: 32px 12px;
+  padding: 28px 12px;
   text-align: center;
   font-size: 0.85rem;
   color: var(--color-text-muted);
 }
 
-.history-empty i {
-  display: block;
-  margin-bottom: 8px;
-  font-size: 2rem;
-  opacity: 0.6;
+.history-empty p {
+  margin: 0;
+  font-size: inherit;
+  color: inherit;
 }
 
-.history-empty p {
-  margin: 0 0 4px;
+.history-signin {
+  padding: 36px 12px;
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+.history-signin p {
+  margin: 0 0 14px;
   font-size: inherit;
   color: inherit;
 }
@@ -482,7 +540,7 @@ h1 {
   height: 34px;
   margin: 10px 0;
   border-radius: 8px;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.04));
+  background: linear-gradient(90deg, var(--color-border), var(--color-surface-alt, var(--color-border)), var(--color-border));
   background-size: 200% 100%;
   animation: shimmer 1.2s infinite;
 }
@@ -501,14 +559,15 @@ h1 {
   }
 }
 
-/* ---- Add entry ---- */
-.entry-dialog {
-  padding: 18px;
-  max-width: 420px;
+/* ---- Add entry (inline form inside the History dialog) ---- */
+.entry-form {
+  padding: 12px 18px 14px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-alt, transparent);
 }
 
-.entry-dialog h3 {
-  margin: 0 0 12px;
+.entry-form[hidden] {
+  display: none;
 }
 
 .form-grid {
@@ -524,9 +583,7 @@ h1 {
 .field label {
   display: block;
   margin-bottom: 3px;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
+  font-size: 0.75rem;
   color: var(--color-text-muted);
 }
 
@@ -539,7 +596,7 @@ h1 {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-top: 14px;
+  margin-top: 12px;
 }
 
 .form-buttons {
@@ -548,14 +605,12 @@ h1 {
 }
 
 .entry-preview {
-  font-family: var(--font-mono);
   font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
   color: var(--color-text-muted);
 }
 
 .entry-preview.bad {
-  font-family: var(--font-body);
-  font-size: 0.78rem;
   color: var(--color-danger, #e05252);
 }
 

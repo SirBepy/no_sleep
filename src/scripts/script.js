@@ -298,18 +298,15 @@ async function signInWithGoogle() {
     }
 }
 
-async function ensureSignedIn() {
-    if (user) return true;
-    return signInWithGoogle();
-}
-
 async function setupCloud() {
     const accountButton = document.getElementById('account-btn');
     const menu = document.getElementById('account-menu');
     const history = createHistory({
         getStore: () => store,
-        ensureSignedIn,
+        isSignedIn: () => Boolean(user),
+        signIn: signInWithGoogle,
         getLiveId: () => (session ? session.id : null),
+        getLiveElapsedMs: currentElapsed,
     });
 
     accountButton.addEventListener('click', async () => {
@@ -337,6 +334,7 @@ async function setupCloud() {
         renderAccount();
         console.log(user ? `Signed in as ${user.email}` : 'Signed out');
         saveSessionNow();
+        history.refresh();
     });
     setInterval(saveSessionNow, SAVE_INTERVAL_MS);
 }

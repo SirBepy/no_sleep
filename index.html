@@ -43,7 +43,6 @@
         <h1>No Sleep</h1>
 
         <div class="timer">
-            <span class="running-for">Running for:</span> <br />
             <span class="time-slot">
                 <span id="time" class="time-display" role="button" tabindex="0" title="Click to edit"></span>
                 <input id="time-input" class="time-input" type="text" inputmode="numeric" autocomplete="off"
@@ -52,6 +51,7 @@
                         class="ph ph-x"></i></button>
             </span>
             <div class="time-error" id="time-error" role="alert"></div>
+            <div class="running-for">running for</div>
         </div>
 
         <button class="pause-toggle" id="pause-toggle">
@@ -76,13 +76,8 @@
                         class="ph ph-x"></i></button>
             </div>
         </div>
-        <div class="history-summary"><span>Last 30 days</span><span>Total <b id="history-total">-</b></span></div>
-        <div class="history-body" id="history-body"></div>
-    </dialog>
-
-    <dialog class="entry-dialog card" id="entry-dialog" aria-labelledby="entry-title">
-        <form id="entry-form" method="dialog">
-            <h3 id="entry-title">Add entry</h3>
+        <div class="history-summary">Last 30 days<b id="history-total">-</b></div>
+        <form class="entry-form" id="entry-form" hidden>
             <div class="form-grid">
                 <div class="field full"><label for="entry-date">Date</label><input class="input" type="date"
                         id="entry-date" required></div>
@@ -101,6 +96,7 @@
                 </div>
             </div>
         </form>
+        <div class="history-body" id="history-body"></div>
     </dialog>
 
     <div class="footer">

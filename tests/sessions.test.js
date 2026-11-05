@@ -34,8 +34,10 @@ test('parseHms accepts hh:mm:ss and rejects everything else', () => {
     assert.equal(parseHms(''), null);
 });
 
-test('formatDuration drops seconds and pads minutes', () => {
-    assert.equal(formatDuration(0), '0h 00m');
+test('formatDuration drops seconds, pads minutes and omits a zero hour', () => {
+    assert.equal(formatDuration(0), '0m');
+    assert.equal(formatDuration(9 * 60000 + 59000), '9m');
+    assert.equal(formatDuration(60 * 60000), '1h 00m');
     assert.equal(formatDuration(3 * 3600000 + 5 * 60000 + 59000), '3h 05m');
 });
 
@@ -84,6 +86,8 @@ test('buildManualEntry rejects bad input with a message', () => {
     assert.match(buildManualEntry({ date: '2026-11-04', start: '10:00', stop: '09:00' }, NOW).error, /after start/);
     assert.match(buildManualEntry({ date: '2026-11-04', start: '10:00', stop: '10:00' }, NOW).error, /after start/);
     assert.match(buildManualEntry({ date: '2026-11-05', start: '16:00', stop: '17:00' }, NOW).error, /future/);
+    // Started already, but the stop time has not happened yet.
+    assert.match(buildManualEntry({ date: '2026-11-05', start: '14:00', stop: '16:00' }, NOW).error, /future/);
 });
 
 test('startedAtForElapsed keeps paused time inside the session range', () => {
