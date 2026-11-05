@@ -43,21 +43,10 @@ export function dayLabel(key, nowMs) {
     return new Date(y, m - 1, d).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
-/** Start of the local day containing `ms`. */
-export function startOfDay(ms) {
-    const d = new Date(ms);
-    d.setHours(0, 0, 0, 0);
-    return d.getTime();
-}
-
 /** Time actually counted: pauses excluded. Manual rows and heartbeats both store it as activeMs. */
 export function sessionDurationMs(session) {
     if (typeof session.activeMs === 'number') return session.activeMs;
     return Math.max(0, (session.endedAt ?? session.startedAt) - session.startedAt);
-}
-
-export function totalMs(sessions) {
-    return sessions.reduce((sum, s) => sum + sessionDurationMs(s), 0);
 }
 
 /** Total counted time per local day, keyed by dayKey. */

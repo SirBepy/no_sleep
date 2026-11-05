@@ -8,8 +8,6 @@ import {
     formatDuration,
     dayKey,
     dayLabel,
-    startOfDay,
-    totalMs,
     totalsByDay,
     sessionDurationMs,
     monthOf,
@@ -49,14 +47,9 @@ test('dayLabel names today and yesterday, otherwise a short date', () => {
     assert.match(dayLabel('2026-10-27', NOW), /Oct/);
 });
 
-test('startOfDay is local midnight', () => {
-    assert.equal(startOfDay(NOW), at(2026, 11, 5));
-});
-
 test('sessionDurationMs falls back to the time range when activeMs is missing', () => {
     assert.equal(sessionDurationMs({ startedAt: 1000, endedAt: 61000 }), 60000);
     assert.equal(sessionDurationMs({ startedAt: 1000, endedAt: 61000, activeMs: 5000 }), 5000);
-    assert.equal(totalMs([{ startedAt: 0, activeMs: 10 }, { startedAt: 0, activeMs: 5 }]), 15);
 });
 
 test('totalsByDay sums per local day', () => {
