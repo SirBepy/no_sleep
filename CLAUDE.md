@@ -5,7 +5,7 @@ Deploy: github-pages
 
 ## Structure
 
-index.html, sw.js, src/scripts/script.js (timer, wake lock, session saving), src/scripts/sessions.js (pure logic), src/scripts/history.js (History and Add entry dialogs), src/scripts/store.js (Firebase), src/scripts/firebase-config.js, src/scripts/build-info.js, src/styles/styles.css, tests/sessions.test.js, assets/favicon.ico
+index.html, sw.js, src/scripts/script.js (timer, wake lock, session saving), src/scripts/sessions.js (pure logic), src/scripts/history.js (History and Add entry dialogs), src/scripts/store.js (Firebase), src/scripts/firebase-config.js, src/scripts/build-info.js, src/styles/styles.css, tests/sessions.test.js, favicon.ico, assets/images/favicon.png, assets/images/favicon.svg, manifest.json
 
 ## Rules
 

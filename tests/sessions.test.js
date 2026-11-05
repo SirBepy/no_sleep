@@ -2,7 +2,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-    formatHms,
     splitHms,
     replaceUnit,
     UNIT_MAX,
@@ -24,13 +23,6 @@ import {
 
 const at = (y, mo, d, h = 0, mi = 0) => new Date(y, mo - 1, d, h, mi).getTime();
 const NOW = at(2026, 11, 5, 15, 0);
-
-test('formatHms pads and handles hours over 99', () => {
-    assert.equal(formatHms(0), '00:00:00');
-    assert.equal(formatHms(12 * 60 * 1000 + 41 * 1000), '00:12:41');
-    assert.equal(formatHms(100 * 3600 * 1000), '100:00:00');
-    assert.equal(formatHms(-5), '00:00:00');
-});
 
 test('splitHms and replaceUnit change one field and keep the other two', () => {
     const ms = (3 * 3600 + 25 * 60 + 40) * 1000;

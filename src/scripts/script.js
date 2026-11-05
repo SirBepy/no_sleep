@@ -1,4 +1,4 @@
-import { replaceUnit, splitHms, startedAtForElapsed, UNIT_MAX } from './sessions.js';
+import { pad2, replaceUnit, splitHms, startedAtForElapsed, UNIT_MAX } from './sessions.js';
 import { createHistory } from './history.js';
 
 const SAVE_INTERVAL_MS = 30000;
@@ -18,7 +18,7 @@ let audioCtx = null;
 let silentOscillator = null;
 // Current recording: id names the Firestore doc, startedAt is the wall-clock start.
 let session = null;
-// Firebase store module and signed-in user; both stay null when signed out or the SDK failed to load.
+// Firebase store module (null until it imports, and for good if the CDN fails) and the signed-in user (null while signed out).
 let store = null;
 let user = null;
 let editingUnit = null;
@@ -145,8 +145,6 @@ function saveSessionNow() {
         manual: false,
     }).catch((err) => console.error('Session save failed:', err));
 }
-
-const pad2 = (n) => String(n).padStart(2, '0');
 
 function renderTimer() {
     const timerElement = document.getElementById('time');

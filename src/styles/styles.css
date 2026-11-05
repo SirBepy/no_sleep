@@ -112,7 +112,7 @@ h1 {
   display: inline;
 }
 
-/* One focus ring for every control this page draws itself; the styleguide's .btn keeps its own. */
+/* One focus ring for the card's own controls; the styleguide's .btn keeps its own, and the calendar controls repeat this ring next to their styles. */
 .seg-text:focus-visible,
 .pause-toggle:focus-visible,
 .account-btn:focus-visible,
@@ -124,7 +124,7 @@ h1 {
   outline-offset: 2px;
 }
 
-/* ---- Account (top-left, mirrors the info button) ---- */
+/* ---- Account (top-left corner of the card) ---- */
 .account {
   position: absolute;
   top: 1rem;

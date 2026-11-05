@@ -1,11 +1,6 @@
 // Pure session logic: no DOM, no Firebase. Kept dependency-free so `node --test` can load it.
 
-const pad2 = (n) => String(n).padStart(2, '0');
-
-export function formatHms(ms) {
-    const { h, m, s } = splitHms(ms);
-    return `${pad2(h)}:${pad2(m)}:${pad2(s)}`;
-}
+export const pad2 = (n) => String(n).padStart(2, '0');
 
 export function splitHms(ms) {
     const total = Math.max(0, Math.floor(ms / 1000));
