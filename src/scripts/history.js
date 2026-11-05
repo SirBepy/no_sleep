@@ -187,7 +187,6 @@ export function createHistory({ getStore, isSignedIn, signIn, getLiveId, getLive
             grid.append(cell);
         }
         section.append(grid);
-        section.append(dayDetail(now));
         return section;
     }
 
@@ -224,7 +223,11 @@ export function createHistory({ getStore, isSignedIn, signIn, getLiveId, getLive
             return;
         }
         const now = Date.now();
-        body.append(calendarSection(now));
+        // Calendar left, the selected day's list right; the day list only exists once the month has loaded.
+        const layout = el('div', 'history-layout');
+        layout.append(calendarSection(now));
+        if (state.monthStatus === 'ready') layout.append(dayDetail(now));
+        body.append(layout);
         if (focusedDay) body.querySelector(`[data-day="${focusedDay}"]`)?.focus();
     }
 
@@ -337,7 +340,10 @@ export function createHistory({ getStore, isSignedIn, signIn, getLiveId, getLive
         } else if (data.day) {
             state.selected = state.selected === data.day ? null : data.day;
             render();
-            if (state.selected) $('day-detail')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            // Stacked on a phone the list sits below the calendar; side by side it is already in view.
+            if (state.selected && window.matchMedia('(max-width: 720px)').matches) {
+                $('day-detail')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            }
         } else if (data.addForDay) {
             openEntryForm(data.addForDay);
         }

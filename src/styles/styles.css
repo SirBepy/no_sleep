@@ -337,7 +337,7 @@ h1 {
   padding: 0;
   max-width: 520px;
   width: calc(100% - 2rem);
-  max-height: min(680px, calc(100vh - 2rem));
+  max-height: calc(100vh - 2rem);
   color: var(--color-text);
   text-align: left;
   /* Fade and rise on open and close. The discrete display/overlay transitions keep the dialog in the
@@ -351,6 +351,12 @@ h1 {
 
 .entry-dialog {
   max-width: 400px;
+}
+
+/* Fixed size on purpose: picking days or months only changes what is inside, never the dialog itself. */
+.history-dialog {
+  max-width: 880px;
+  height: min(600px, calc(100vh - 2rem));
 }
 
 .history-dialog[open],
@@ -417,6 +423,36 @@ h1 {
   min-height: 0;
   overflow: auto;
   padding: 0 18px 18px;
+}
+
+/* Calendar on the left, the selected day's entries on the right; each column scrolls on its own. */
+.history-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 24px;
+  height: 100%;
+}
+
+.history-layout > * {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.history-layout .day-detail {
+  padding-left: 24px;
+  border-left: 1px solid var(--color-border);
+}
+
+@media (max-width: 720px) {
+  .history-layout {
+    display: block;
+    height: auto;
+  }
+
+  .history-layout .day-detail {
+    padding-left: 0;
+    border-left: none;
+  }
 }
 
 .day {
@@ -565,9 +601,23 @@ h1 {
 
 /* ---- Month calendar ---- */
 .calendar {
-  margin-top: 22px;
-  padding-top: 14px;
-  border-top: 1px solid var(--color-border);
+  margin-top: 14px;
+}
+
+.history-layout .day-detail .day {
+  margin-top: 0;
+}
+
+@media (max-width: 720px) {
+  .calendar {
+    padding-top: 14px;
+  }
+
+  .history-layout .day-detail {
+    margin-top: 14px;
+    padding-top: 4px;
+    border-top: 1px solid var(--color-border);
+  }
 }
 
 .cal-head {
