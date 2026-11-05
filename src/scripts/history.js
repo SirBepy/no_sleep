@@ -200,9 +200,13 @@ export function createHistory({ getStore, isSignedIn, signIn, getLiveId, getLive
         const rows = rowsOfDay(state.selected);
         const day = el('div', 'day');
         day.append(dayHead(dayLabel(state.selected, now), dayTotal(rows)));
-        for (const row of rows) day.append(renderEntry(row));
-        if (rows.length === 0) day.append(el('p', 'history-hint', 'Nothing tracked this day.'));
-        day.append(button('btn btn-ghost btn-sm detail-add', 'Add entry for this day', { addForDay: state.selected }));
+        const list = el('div', 'day-list');
+        for (const row of rows) list.append(renderEntry(row));
+        if (rows.length === 0) list.append(el('p', 'history-hint', 'Nothing tracked this day.'));
+        // The list scrolls; the button stays pinned bottom right whatever the entry count.
+        const foot = el('div', 'day-foot');
+        foot.append(button('btn btn-ghost btn-sm detail-add', 'Add entry for this day', { addForDay: state.selected }));
+        day.append(list, foot);
         detail.append(day);
         return detail;
     }
