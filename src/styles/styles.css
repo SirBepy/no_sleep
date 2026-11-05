@@ -50,6 +50,8 @@ h1 {
   font-size: var(--time-size);
   font-weight: 500;
   line-height: 1.2;
+  /* Pinned so swapping a number for its input can never nudge the controls below. */
+  height: 1.2em;
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
@@ -233,7 +235,8 @@ h1 {
   display: none;
 }
 
-/* Sized in ch to the field's digit limit so the number is never clipped. */
+/* Sized in ch to the field's digit limit so the number is never clipped. The underline is an inset
+   shadow, not a border, and the height is the text's own line box, so entering edit mode moves nothing. */
 .seg-input {
   font-size: inherit;
   line-height: inherit;
@@ -244,9 +247,10 @@ h1 {
   text-align: center;
   background: none;
   border: none;
-  border-bottom: 2px solid var(--color-primary);
   border-radius: 0;
-  padding: 0;
+  box-shadow: inset 0 -2px 0 var(--color-primary);
+  height: 1.2em;
+  padding: 0 2px;
   outline: none;
   box-sizing: content-box;
 }
@@ -296,10 +300,39 @@ h1 {
   display: none;
 }
 
+/* The rest of the page is flat, so the styleguide's glossy gradient and glow buttons are flattened to match. */
+.btn,
+.btn:hover,
+.btn:active {
+  box-shadow: none;
+  transform: none;
+  filter: none;
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  border: 1px solid var(--color-primary);
+}
+
+.btn-primary:hover {
+  background: color-mix(in srgb, var(--color-primary) 85%, white);
+}
+
+/* Inputs get the same flat treatment: one even border, a colour change on focus instead of a glow. */
+.input {
+  border: 1px solid var(--color-border);
+}
+
+.input:focus {
+  border-color: var(--color-primary);
+  box-shadow: none;
+}
+
 /* ---- Dialogs ----
    The styleguide reset zeroes every margin, which also removes <dialog>'s
    built-in auto margins, so centering is restated here. */
-.history-dialog {
+.history-dialog,
+.entry-dialog {
   margin: auto;
   padding: 0;
   max-width: 520px;
@@ -307,6 +340,34 @@ h1 {
   max-height: min(680px, calc(100vh - 2rem));
   color: var(--color-text);
   text-align: left;
+  /* Fade and rise on open and close. The discrete display/overlay transitions keep the dialog in the
+     top layer until the fade-out ends; without them close() would cut the animation off. */
+  opacity: 0;
+  translate: 0 10px;
+  scale: 0.98;
+  transition: opacity 0.18s ease, translate 0.18s ease, scale 0.18s ease,
+    overlay 0.18s allow-discrete, display 0.18s allow-discrete;
+}
+
+.entry-dialog {
+  max-width: 400px;
+}
+
+.history-dialog[open],
+.entry-dialog[open] {
+  opacity: 1;
+  translate: 0 0;
+  scale: 1;
+}
+
+@starting-style {
+
+  .history-dialog[open],
+  .entry-dialog[open] {
+    opacity: 0;
+    translate: 0 10px;
+    scale: 0.98;
+  }
 }
 
 .history-dialog[open] {
@@ -314,8 +375,23 @@ h1 {
   flex-direction: column;
 }
 
-.history-dialog::backdrop {
+.history-dialog::backdrop,
+.entry-dialog::backdrop {
+  background: rgba(0, 0, 0, 0);
+  transition: background 0.18s ease, overlay 0.18s allow-discrete, display 0.18s allow-discrete;
+}
+
+.history-dialog[open]::backdrop,
+.entry-dialog[open]::backdrop {
   background: rgba(0, 0, 0, 0.5);
+}
+
+@starting-style {
+
+  .history-dialog[open]::backdrop,
+  .entry-dialog[open]::backdrop {
+    background: rgba(0, 0, 0, 0);
+  }
 }
 
 .history-head {
@@ -331,12 +407,7 @@ h1 {
   color: var(--color-text);
 }
 
-.history-head-actions {
-  display: flex;
-  gap: 6px;
-}
-
-.history-head-actions .btn {
+.history-head .btn {
   min-height: 40px;
   justify-content: center;
 }
@@ -579,14 +650,20 @@ h1 {
   border-color: var(--color-primary);
 }
 
+/* Filled, not just outlined: today's ring and a shaded busy day both already use the primary colour. */
 .cal-day.is-selected {
-  border: 2px solid var(--color-primary);
-  padding: 3px 0;
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-background);
 }
 
 .cal-num {
   font-size: 0.75rem;
   color: var(--color-text-muted);
+}
+
+.cal-day.is-selected .cal-num {
+  color: inherit;
 }
 
 .cal-hours {
@@ -640,17 +717,18 @@ h1 {
   .skeleton {
     animation: none;
   }
+
+  .history-dialog,
+  .entry-dialog,
+  .history-dialog::backdrop,
+  .entry-dialog::backdrop {
+    transition: none;
+  }
 }
 
-/* ---- Add entry (inline form inside the History dialog) ---- */
+/* ---- Add entry (its own small dialog) ---- */
 .entry-form {
-  padding: 12px 18px 14px;
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface-alt, transparent);
-}
-
-.entry-form[hidden] {
-  display: none;
+  padding: 8px 18px 18px;
 }
 
 .form-grid {
