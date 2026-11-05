@@ -119,6 +119,11 @@
           return { el: el, css: css };
         }
       }];
+      // The widget defaults to its star pattern; Pulse is this page's own look, so it is the
+      // first-visit default. Only seeded when nothing is stored, so a later pick in settings sticks.
+      try {
+        if (!localStorage.getItem("tabs-labs-bg-variant")) localStorage.setItem("tabs-labs-bg-variant", "pulse");
+      } catch (err) { /* storage blocked: the widget falls back to its default */ }
     </script>
     <!-- Animated background. To disable: set window.BEPY_BACKGROUND = false before this tag. To use a custom SVG: set window.BEPY_BG_PATTERN = 'your-pattern.svg' before this tag. -->
     <script src="https://cdn.jsdelivr.net/gh/sirbepy/sirbepy-styleguide@main/widget/background.js"></script>
