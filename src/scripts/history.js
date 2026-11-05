@@ -1,5 +1,5 @@
 // History dialog: a month calendar of daily totals and the exact hours of the selected day (today
-// by default) inline below it. Add entry is its own small dialog, opened from the selected day.
+// by default) beside it, stacked below it on a phone. Add entry is its own small dialog, opened from the selected day.
 import {
     addMonths,
     buildManualEntry,
@@ -22,6 +22,11 @@ function el(tag, className, text) {
     if (className) node.className = className;
     if (text !== undefined) node.textContent = text;
     return node;
+}
+
+function isThisMonth(month, nowMs) {
+    const current = monthOf(nowMs);
+    return month.year === current.year && month.month === current.month;
 }
 
 function icon(name) {
@@ -132,7 +137,7 @@ export function createHistory({ getStore, isSignedIn, signIn, getLiveId, getLive
     function calendarSection(now) {
         const section = el('section', 'calendar');
         const today = dayKey(now);
-        const isCurrentMonth = state.month.year === monthOf(now).year && state.month.month === monthOf(now).month;
+        const isCurrentMonth = isThisMonth(state.month, now);
 
         const label = new Date(state.month.year, state.month.month, 1)
             .toLocaleDateString([], { month: 'long', year: 'numeric' });
@@ -201,6 +206,7 @@ export function createHistory({ getStore, isSignedIn, signIn, getLiveId, getLive
         const day = el('div', 'day');
         day.append(dayHead(dayLabel(state.selected, now), dayTotal(rows)));
         const list = el('div', 'day-list');
+        list.dataset.day = state.selected;
         for (const row of rows) list.append(renderEntry(row));
         if (rows.length === 0) list.append(el('p', 'history-hint', 'Nothing tracked this day.'));
         // The list scrolls; the button stays pinned bottom right whatever the entry count.
@@ -212,10 +218,16 @@ export function createHistory({ getStore, isSignedIn, signIn, getLiveId, getLive
     }
 
     function render() {
-        // Re-rendering replaces every node, so keyboard focus is handed back to the same calendar day afterwards.
+        // Re-rendering replaces every node, so keyboard focus is handed back to the same calendar day afterwards,
+        // and the day list keeps its scroll position (snapshots arrive every ~30s while recording, and a delete
+        // confirm re-renders too; without this the list would jump to the top under her finger).
         const focusedDay = document.activeElement && document.activeElement.dataset
             ? document.activeElement.dataset.day
             : null;
+        const prevList = body.querySelector('.day-list');
+        const prevListDay = prevList?.dataset.day;
+        const prevListTop = prevList?.scrollTop ?? 0;
+        const prevCalendarTop = body.querySelector('.history-layout > .calendar')?.scrollTop ?? 0;
         body.replaceChildren();
         const signedIn = isSignedIn();
         if (!signedIn) {
@@ -232,6 +244,10 @@ export function createHistory({ getStore, isSignedIn, signIn, getLiveId, getLive
         layout.append(calendarSection(now));
         if (state.monthStatus === 'ready') layout.append(dayDetail(now));
         body.append(layout);
+        const calendar = layout.querySelector('.calendar');
+        if (calendar) calendar.scrollTop = prevCalendarTop;
+        const list = layout.querySelector('.day-list');
+        if (list && list.dataset.day === prevListDay) list.scrollTop = prevListTop;
         if (focusedDay) body.querySelector(`[data-day="${focusedDay}"]`)?.focus();
     }
 
@@ -301,13 +317,23 @@ export function createHistory({ getStore, isSignedIn, signIn, getLiveId, getLive
         clearInterval(liveTicker);
     });
 
-    // A click on the dialog element itself lands on its backdrop (the content fills the box).
+    // A click on the dialog element itself lands on its backdrop (the content fills the box). The press must
+    // also have started there: dragging out of an input and releasing on the backdrop fires a click on the
+    // dialog too, and closing then would throw away what was typed.
+    function backdropClick(dlg) {
+        let pressedOnBackdrop = false;
+        dlg.addEventListener('mousedown', (ev) => { pressedOnBackdrop = ev.target === dlg; });
+        return (ev) => ev.target === dlg && pressedOnBackdrop;
+    }
+    const isHistoryBackdrop = backdropClick(dialog);
+    const isEntryBackdrop = backdropClick(entryDialog);
+
     entryDialog.addEventListener('click', (ev) => {
-        if (ev.target === entryDialog) entryDialog.close();
+        if (isEntryBackdrop(ev)) entryDialog.close();
     });
 
     dialog.addEventListener('click', async (ev) => {
-        if (ev.target === dialog) {
+        if (isHistoryBackdrop(ev)) {
             dialog.close();
             return;
         }
@@ -335,14 +361,12 @@ export function createHistory({ getStore, isSignedIn, signIn, getLiveId, getLive
         } else if (data.monthStep) {
             state.month = addMonths(state.month, Number(data.monthStep));
             // Landing back on the current month selects today again, like opening the dialog does.
-            const today = dayKey(Date.now());
-            state.selected = monthOf(Date.now()).year === state.month.year && monthOf(Date.now()).month === state.month.month
-                ? today
-                : null;
+            state.selected = isThisMonth(state.month, Date.now()) ? dayKey(Date.now()) : null;
             watchMonth();
             render();
         } else if (data.day) {
-            state.selected = state.selected === data.day ? null : data.day;
+            // Clicking the selected day again keeps it selected: Add entry lives in its list, so deselecting would hide it.
+            state.selected = data.day;
             render();
             // Stacked on a phone the list sits below the calendar; side by side it is already in view.
             if (state.selected && window.matchMedia('(max-width: 720px)').matches) {
