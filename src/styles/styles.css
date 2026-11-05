@@ -413,9 +413,13 @@ h1 {
   color: var(--color-text);
 }
 
+/* A small square close button; .btn-sm's wide padding and card radius made it a tall pill. */
 .history-head .btn {
-  min-height: 40px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
   justify-content: center;
+  border-radius: 8px;
 }
 
 .history-body {
@@ -433,14 +437,41 @@ h1 {
   height: 100%;
 }
 
+/* overflow-x is hidden explicitly: overflow-y alone makes it auto, and the delete button's negative
+   margin would then show a stray horizontal scrollbar. */
 .history-layout > * {
   min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
 }
 
+/* The right column is head, scrolling list, pinned footer; only the list scrolls. */
 .history-layout .day-detail {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   padding-left: 24px;
   border-left: 1px solid var(--color-border);
+}
+
+.day-detail .day {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.day-list {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.day-foot {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 10px;
 }
 
 @media (max-width: 720px) {
@@ -450,8 +481,18 @@ h1 {
   }
 
   .history-layout .day-detail {
+    display: block;
+    overflow: visible;
     padding-left: 0;
     border-left: none;
+  }
+
+  .day-detail .day {
+    display: block;
+  }
+
+  .day-list {
+    overflow: visible;
   }
 }
 
@@ -727,10 +768,6 @@ h1 {
 
 .day-detail {
   margin-top: 6px;
-}
-
-.detail-add {
-  margin-top: 10px;
 }
 
 .history-error {
