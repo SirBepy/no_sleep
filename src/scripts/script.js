@@ -32,6 +32,7 @@ let session = null;
 let store = null;
 let user = null;
 let storeAttempts = 0;
+let connecting = null;
 // Why saving is unavailable, shown by the account menu and the History prompt; null while all is well.
 let saveNotice = null;
 const SAVE_UNAVAILABLE = 'Saving is unavailable right now, check your connection.';
@@ -273,6 +274,8 @@ function togglePause() {
         updateTimer();
     }
     showPauseState();
+    // The 1 s tick that normally persists is stopped while paused, so save the new state now or a reload would come back running.
+    persistSession();
 }
 
 // ----- Account, saving and history -----
@@ -326,6 +329,12 @@ function renderAccount() {
 // import leaves `store` null, and every sign-in click tries again.
 async function connectStore() {
     if (store) return true;
+    // Overlapping calls (startup plus a sign-in click) share one import, so the listener and interval below register once.
+    connecting ??= importStore().finally(() => { connecting = null; });
+    return connecting;
+}
+
+async function importStore() {
     try {
         // A module that failed to load stays failed for its URL, so a retry asks for a fresh one.
         store = await import(storeAttempts === 0 ? './store.js' : `./store.js?retry=${storeAttempts}`);
