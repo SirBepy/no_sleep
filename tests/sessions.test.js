@@ -17,6 +17,12 @@ import {
     shadeLevel,
     buildManualEntry,
     startedAtForElapsed,
+    rowsOfDay,
+    rowsTotalMs,
+    activeMsNow,
+    pausedMsNow,
+    snapshotSession,
+    restoreSnapshot,
 } from '../src/scripts/sessions.js';
 
 const at = (y, mo, d, h = 0, mi = 0) => new Date(y, mo - 1, d, h, mi).getTime();
@@ -113,6 +119,78 @@ test('buildManualEntry rejects bad input with a message', () => {
     assert.match(buildManualEntry({ date: '2026-11-05', start: '16:00', stop: '17:00' }, NOW).error, /future/);
     // Started already, but the stop time has not happened yet.
     assert.match(buildManualEntry({ date: '2026-11-05', start: '14:00', stop: '16:00' }, NOW).error, /future/);
+});
+
+test('totalsByDay and rowsTotalMs count the running session at its live value, not its saved heartbeat', () => {
+    const rows = [
+        { id: 'old', startedAt: at(2026, 11, 5, 8), activeMs: 600000 },
+        { id: 'live', startedAt: at(2026, 11, 5, 9), activeMs: 60000 },
+        { id: 'other-day', startedAt: at(2026, 11, 4, 9), activeMs: 120000 },
+    ];
+    const live = { id: 'live', ms: 900000 };
+    assert.equal(totalsByDay(rows, live).get('2026-11-05'), 600000 + 900000);
+    assert.equal(totalsByDay(rows, live).get('2026-11-04'), 120000);
+    // Without live info the saved value is used, and a live id that is not in the rows changes nothing.
+    assert.equal(totalsByDay(rows).get('2026-11-05'), 660000);
+    assert.equal(totalsByDay(rows, { id: 'missing', ms: 5 }).get('2026-11-05'), 660000);
+    assert.equal(rowsTotalMs(rows.slice(0, 2), live), 1500000);
+    assert.equal(rowsTotalMs([], live), 0);
+});
+
+test('rowsOfDay keeps only that local day, newest first', () => {
+    const rows = [
+        { id: 'a', startedAt: at(2026, 11, 5, 8) },
+        { id: 'b', startedAt: at(2026, 11, 4, 23, 59) },
+        { id: 'c', startedAt: at(2026, 11, 5, 14) },
+        { id: 'd', startedAt: at(2026, 11, 6, 0, 0) },
+    ];
+    assert.deepEqual(rowsOfDay(rows, '2026-11-05').map((r) => r.id), ['c', 'a']);
+    assert.deepEqual(rowsOfDay(rows, '2026-11-09'), []);
+});
+
+test('activeMsNow and pausedMsNow follow the running and paused states', () => {
+    const running = { elapsedMs: 5000, startTime: 1000, pausedMs: 300, isPaused: false, pauseStartedAt: null };
+    assert.equal(activeMsNow(running, 4000), 8000);
+    assert.equal(pausedMsNow(running, 4000), 300);
+    const paused = { elapsedMs: 8000, startTime: 4000, pausedMs: 300, isPaused: true, pauseStartedAt: 4000 };
+    assert.equal(activeMsNow(paused, 9000), 8000);
+    assert.equal(pausedMsNow(paused, 9000), 5300);
+});
+
+test('a reload while paused restores paused with the same elapsed value', () => {
+    const session = { id: 's1', startedAt: 1000 };
+    const paused = { elapsedMs: 8000, startTime: 4000, pausedMs: 300, isPaused: true, pauseStartedAt: 4000 };
+    const saved = JSON.parse(JSON.stringify(snapshotSession(session, paused, 9000)));
+    const restored = restoreSnapshot(saved);
+    assert.equal(restored.isPaused, true);
+    assert.equal(restored.pauseStartedAt, 4000);
+    assert.equal(restored.elapsedMs, 8000);
+    assert.equal(restored.pausedMs, 300);
+    assert.deepEqual(restored.session, session);
+    // Resuming the restored timer later still counts the whole pause, including the time the page was closed.
+    const timer = { ...restored, startTime: 20000 };
+    assert.equal(activeMsNow(timer, 20000), 8000);
+    assert.equal(pausedMsNow(timer, 20000), 300 + 16000);
+});
+
+test('a reload while running restores running with the elapsed time folded in', () => {
+    const session = { id: 's1', startedAt: 1000 };
+    const running = { elapsedMs: 5000, startTime: 1000, pausedMs: 300, isPaused: false, pauseStartedAt: null };
+    const restored = restoreSnapshot(JSON.parse(JSON.stringify(snapshotSession(session, running, 4000))));
+    assert.equal(restored.isPaused, false);
+    assert.equal(restored.pauseStartedAt, null);
+    assert.equal(restored.elapsedMs, 8000);
+    assert.equal(restored.pausedMs, 300);
+});
+
+test('restoreSnapshot rejects unusable data and degrades a pause with no start to running', () => {
+    assert.equal(restoreSnapshot(null), null);
+    assert.equal(restoreSnapshot({}), null);
+    assert.equal(restoreSnapshot({ id: 'x', startedAt: 'nope' }), null);
+    const odd = restoreSnapshot({ id: 'x', startedAt: 5, elapsedMs: 'junk', isPaused: true });
+    assert.equal(odd.isPaused, false);
+    assert.equal(odd.elapsedMs, 0);
+    assert.equal(odd.pausedMs, 0);
 });
 
 test('startedAtForElapsed keeps paused time inside the session range', () => {
