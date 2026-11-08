@@ -41,10 +41,15 @@ self.addEventListener("fetch", (e) => {
   e.respondWith(
     fetch(e.request)
       .then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(e.request, copy));
+        // Only good responses are cached, so a 404 or 5xx is never replayed offline later.
+        if (response.ok) {
+          const copy = response.clone();
+          // waitUntil keeps the worker alive until the write lands.
+          e.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.put(e.request, copy)));
+        }
         return response;
       })
-      .catch(() => caches.match(e.request)),
+      // respondWith(undefined) fails the request obscurely; a cache miss becomes a clean network error.
+      .catch(() => caches.match(e.request).then((cached) => cached || Response.error())),
   );
 });
