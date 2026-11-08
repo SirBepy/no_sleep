@@ -1,3 +1,8 @@
+/* The shared styleguide defines no danger colour, so the delete, error and invalid states share this one. */
+:root {
+  --color-danger: #e05252;
+}
+
 body {
   font-family: var(--font-body);
   margin: 0;
@@ -114,16 +119,31 @@ h1 {
   display: inline;
 }
 
-/* One focus ring for the card's own controls; the styleguide's .btn keeps its own, and the calendar controls repeat this ring next to their styles. */
+/* One focus ring for the card's own controls, the calendar's and the day list's Add entry button. */
 .seg-text:focus-visible,
 .pause-toggle:focus-visible,
 .account-btn:focus-visible,
 .account-menu button:focus-visible,
 .time-cancel:focus-visible,
 .entry-delete:focus-visible,
-.entry-confirm button:focus-visible {
+.entry-confirm button:focus-visible,
+.cal-nav:focus-visible,
+.cal-day:focus-visible,
+.detail-add:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
+}
+
+/* The round, chrome-less icon buttons; each adds its own size, padding and colour below. */
+.account-btn,
+.time-cancel,
+.entry-delete,
+.cal-nav {
+  display: flex;
+  background: none;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
 }
 
 /* ---- Account (top-left corner of the card) ---- */
@@ -135,15 +155,10 @@ h1 {
 }
 
 .account-btn {
-  display: flex;
   padding: 0;
-  background: none;
-  border: none;
-  border-radius: 50%;
   font-size: 20px;
   line-height: 1;
   color: var(--color-text-muted);
-  cursor: pointer;
   /* Quiet on purpose, but kept at icon contrast (3:1+): sign-in is a one-time chore, not a call to action. */
   opacity: 0.75;
   transition: opacity 0.2s ease;
@@ -183,6 +198,16 @@ h1 {
 }
 
 .account-menu[hidden] {
+  display: none;
+}
+
+.account-notice {
+  display: block;
+  color: var(--color-danger);
+}
+
+/* Beats .account-menu b's display:block, which would otherwise show the hidden email line. */
+.account-menu [hidden] {
   display: none;
 }
 
@@ -268,14 +293,9 @@ h1 {
   left: 100%;
   top: 50%;
   translate: 4px -50%;
-  display: flex;
-  background: none;
-  border: none;
   padding: 10px;
   font-size: 1.1rem;
-  border-radius: 50%;
   color: var(--color-text-muted);
-  cursor: pointer;
 }
 
 .time-cancel:hover {
@@ -289,8 +309,8 @@ h1 {
   margin-top: 10px;
 }
 
+/* Padding comes from the styleguide's .btn-sm; only the slightly smaller text and no-wrap are ours. */
 .btn-sm {
-  padding: 0.4rem 0.9rem;
   font-size: 0.8rem;
   white-space: nowrap;
 }
@@ -596,20 +616,15 @@ h1 {
 
 /* The hit area is padded out to ~40px; the negative margin keeps the row layout unchanged. */
 .entry-delete {
-  display: flex;
   padding: 12px;
   margin: -8px -10px -8px -6px;
   font-size: 1rem;
-  background: none;
-  border: none;
-  border-radius: 50%;
   color: var(--color-text-muted);
-  cursor: pointer;
 }
 
 .entry-delete:hover,
 .entry-delete:focus-visible {
-  color: var(--color-danger, #e05252);
+  color: var(--color-danger);
 }
 
 .entry-confirm {
@@ -632,8 +647,8 @@ h1 {
 }
 
 .entry-confirm .confirm-yes {
-  color: var(--color-danger, #e05252);
-  border-color: var(--color-danger, #e05252);
+  color: var(--color-danger);
+  border-color: var(--color-danger);
 }
 
 .history-signin {
@@ -689,26 +704,14 @@ h1 {
 }
 
 .cal-nav {
-  display: flex;
   padding: 10px;
   font-size: 1rem;
-  background: none;
-  border: none;
-  border-radius: 50%;
   color: var(--color-text);
-  cursor: pointer;
 }
 
 .cal-nav:disabled {
   opacity: 0.3;
   cursor: default;
-}
-
-.cal-nav:focus-visible,
-.cal-day:focus-visible,
-.detail-add:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 2px;
 }
 
 .cal-total {
@@ -793,8 +796,8 @@ h1 {
   margin: 10px 0;
   padding: 10px 12px;
   font-size: 0.8rem;
-  color: var(--color-danger, #e05252);
-  border: 1px solid var(--color-danger, #e05252);
+  color: var(--color-danger);
+  border: 1px solid var(--color-danger);
   border-radius: var(--radius-card);
 }
 
@@ -874,7 +877,7 @@ h1 {
 }
 
 .entry-preview.bad {
-  color: var(--color-danger, #e05252);
+  color: var(--color-danger);
 }
 
 .btn:disabled {
