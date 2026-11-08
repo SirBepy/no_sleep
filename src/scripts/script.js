@@ -1,4 +1,14 @@
-import { pad2, replaceUnit, splitHms, startedAtForElapsed, UNIT_MAX } from './sessions.js';
+import {
+    activeMsNow,
+    pad2,
+    pausedMsNow,
+    replaceUnit,
+    restoreSnapshot,
+    snapshotSession,
+    splitHms,
+    startedAtForElapsed,
+    UNIT_MAX,
+} from './sessions.js';
 import { createHistory } from './history.js';
 
 const SAVE_INTERVAL_MS = 30000;
@@ -18,9 +28,14 @@ let audioCtx = null;
 let silentOscillator = null;
 // Current recording: id names the Firestore doc, startedAt is the wall-clock start.
 let session = null;
-// Firebase store module (null until it imports, and for good if the CDN fails) and the signed-in user (null while signed out).
+// Firebase store module (null until it imports, and again after a failed import until a retry works) and the signed-in user (null while signed out).
 let store = null;
 let user = null;
+let storeAttempts = 0;
+// Why saving is unavailable, shown by the account menu and the History prompt; null while all is well.
+let saveNotice = null;
+const SAVE_UNAVAILABLE = 'Saving is unavailable right now, check your connection.';
+let history = null;
 let editingUnit = null;
 
 function ensureAudioContext() {
@@ -100,32 +115,25 @@ function preventSleep() {
     // Wake lock re-acquisition handled by visibility change
 }
 
-function currentElapsed() {
-    return isPaused ? elapsedMs : elapsedMs + Date.now() - startTime;
-}
-
-function currentPausedMs() {
-    return pausedMs + (isPaused ? Date.now() - pauseStartedAt : 0);
-}
+const timerState = () => ({ elapsedMs, startTime, pausedMs, isPaused, pauseStartedAt });
+const currentElapsed = () => activeMsNow(timerState(), Date.now());
+const currentPausedMs = () => pausedMsNow(timerState(), Date.now());
 
 // sessionStorage keeps a reload inside the same tab on the same session instead of starting a new one.
 function persistSession() {
     if (!session) return;
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify({
-        id: session.id,
-        startedAt: session.startedAt,
-        elapsedMs: currentElapsed(),
-        pausedMs: currentPausedMs(),
-    }));
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(snapshotSession(session, timerState(), Date.now())));
 }
 
 function restoreSession() {
     try {
-        const saved = JSON.parse(sessionStorage.getItem(SESSION_KEY));
-        if (saved && saved.id && Number.isFinite(saved.startedAt)) {
-            session = { id: saved.id, startedAt: saved.startedAt };
-            elapsedMs = Number(saved.elapsedMs) || 0;
-            pausedMs = Number(saved.pausedMs) || 0;
+        const restored = restoreSnapshot(JSON.parse(sessionStorage.getItem(SESSION_KEY)));
+        if (restored) {
+            session = restored.session;
+            elapsedMs = restored.elapsedMs;
+            pausedMs = restored.pausedMs;
+            isPaused = restored.isPaused;
+            pauseStartedAt = restored.pauseStartedAt;
             return;
         }
     } catch (err) {
@@ -240,10 +248,17 @@ function setupTimeEditing() {
     cancel.addEventListener('click', finish);
 }
 
-function togglePause() {
+function showPauseState() {
     const pauseButton = document.getElementById('pause-toggle');
     const pauseHint = document.getElementById('pause-hint');
     if (!pauseButton) return;
+    pauseButton.querySelector('span').textContent = isPaused ? 'Resume' : 'Pause';
+    pauseButton.classList.toggle('active', isPaused);
+    if (pauseHint) pauseHint.classList.toggle('visible', isPaused);
+}
+
+function togglePause() {
+    if (!document.getElementById('pause-toggle')) return;
 
     isPaused = !isPaused;
 
@@ -251,21 +266,34 @@ function togglePause() {
         elapsedMs += Date.now() - startTime;
         pauseStartedAt = Date.now();
         clearInterval(runningTimer);
-        pauseButton.querySelector('span').textContent = 'Resume';
-        pauseButton.classList.add('active');
-        if (pauseHint) pauseHint.classList.add('visible');
     } else {
         pausedMs += Date.now() - pauseStartedAt;
         pauseStartedAt = null;
         startTime = Date.now();
         updateTimer();
-        pauseButton.querySelector('span').textContent = 'Pause';
-        pauseButton.classList.remove('active');
-        if (pauseHint) pauseHint.classList.remove('visible');
     }
+    showPauseState();
 }
 
 // ----- Account, saving and history -----
+
+function renderAccountNotice() {
+    const menu = document.getElementById('account-menu');
+    const button = document.getElementById('account-btn');
+    if (!menu || !button) return;
+    const notice = document.getElementById('account-notice');
+    notice.textContent = saveNotice || '';
+    notice.hidden = !saveNotice;
+    document.getElementById('account-email').hidden = Boolean(saveNotice);
+    document.getElementById('signout-btn').hidden = Boolean(saveNotice);
+    if (saveNotice) {
+        menu.hidden = false;
+        button.title = saveNotice;
+    } else if (!user) {
+        menu.hidden = true;
+        button.title = 'Sign in with Google to save your time';
+    }
+}
 
 function renderAccount() {
     const button = document.getElementById('account-btn');
@@ -275,6 +303,7 @@ function renderAccount() {
     button.classList.toggle('signed-in', Boolean(user));
     button.replaceChildren();
     if (user) {
+        saveNotice = null;
         const avatar = document.createElement('span');
         // Not 'avatar': the shared styleguide styles that class with its own border and shadow ring.
         avatar.className = 'account-initial';
@@ -287,14 +316,43 @@ function renderAccount() {
         const glyph = document.createElement('i');
         glyph.className = 'ph ph-user-circle';
         button.append(glyph);
-        button.title = 'Sign in with Google to save your time';
         button.setAttribute('aria-label', 'Sign in with Google');
         menu.hidden = true;
     }
+    renderAccountNotice();
+}
+
+// Firebase loads lazily: if the CDN is unreachable the timer and wake lock still work. A failed
+// import leaves `store` null, and every sign-in click tries again.
+async function connectStore() {
+    if (store) return true;
+    try {
+        // A module that failed to load stays failed for its URL, so a retry asks for a fresh one.
+        store = await import(storeAttempts === 0 ? './store.js' : `./store.js?retry=${storeAttempts}`);
+    } catch (err) {
+        storeAttempts += 1;
+        console.error('Firebase failed to load, time will not be saved:', err);
+        return false;
+    }
+    store.watchAuth((nextUser) => {
+        user = nextUser;
+        renderAccount();
+        console.log(user ? `Signed in as ${user.email}` : 'Signed out');
+        saveSessionNow();
+        history.refresh();
+    });
+    setInterval(saveSessionNow, SAVE_INTERVAL_MS);
+    return true;
 }
 
 async function signInWithGoogle() {
-    if (!store) return false;
+    if (!(await connectStore())) {
+        saveNotice = SAVE_UNAVAILABLE;
+        renderAccountNotice();
+        return false;
+    }
+    saveNotice = null;
+    renderAccountNotice();
     try {
         await store.signIn();
         return true;
@@ -308,10 +366,11 @@ async function signInWithGoogle() {
 async function setupCloud() {
     const accountButton = document.getElementById('account-btn');
     const menu = document.getElementById('account-menu');
-    const history = createHistory({
+    history = createHistory({
         getStore: () => store,
         isSignedIn: () => Boolean(user),
         signIn: signInWithGoogle,
+        getNotice: () => saveNotice,
         getLiveId: () => (session ? session.id : null),
         getLiveElapsedMs: currentElapsed,
     });
@@ -329,21 +388,7 @@ async function setupCloud() {
     });
     document.getElementById('history-btn').addEventListener('click', history.open);
 
-    // Firebase loads lazily: if the CDN is unreachable the timer and wake lock still work.
-    try {
-        store = await import('./store.js');
-    } catch (err) {
-        console.error('Firebase failed to load, time will not be saved:', err);
-        return;
-    }
-    store.watchAuth((nextUser) => {
-        user = nextUser;
-        renderAccount();
-        console.log(user ? `Signed in as ${user.email}` : 'Signed out');
-        saveSessionNow();
-        history.refresh();
-    });
-    setInterval(saveSessionNow, SAVE_INTERVAL_MS);
+    await connectStore();
 }
 
 async function initialize() {
@@ -390,7 +435,10 @@ async function initialize() {
     setupCloud();
 
     wakeTimer = setInterval(preventSleep, wakeInterval);
-    updateTimer();
+    // A reload while paused comes back paused: draw the frozen value and leave the ticking interval off.
+    showPauseState();
+    if (isPaused) renderTimer();
+    else updateTimer();
     preventSleep();
 
     await requestWakeLock();

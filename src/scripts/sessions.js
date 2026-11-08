@@ -49,14 +49,33 @@ export function sessionDurationMs(session) {
     return Math.max(0, (session.endedAt ?? session.startedAt) - session.startedAt);
 }
 
-/** Total counted time per local day, keyed by dayKey. */
-export function totalsByDay(sessions) {
+/**
+ * Total counted time per local day, keyed by dayKey. The running session (`live.id`) counts at
+ * `live.ms`, its value now, not the last saved heartbeat that is in the row.
+ */
+export function totalsByDay(sessions, live = null) {
     const totals = new Map();
     for (const session of sessions) {
         const key = dayKey(session.startedAt);
-        totals.set(key, (totals.get(key) || 0) + sessionDurationMs(session));
+        totals.set(key, (totals.get(key) || 0) + durationWithLive(session, live));
     }
     return totals;
+}
+
+function durationWithLive(session, live) {
+    return live && session.id === live.id ? live.ms : sessionDurationMs(session);
+}
+
+/** Counted time of a list of rows (one day), with the running session at its live value. */
+export function rowsTotalMs(rows, live = null) {
+    return rows.reduce((sum, row) => sum + durationWithLive(row, live), 0);
+}
+
+/** The rows that started on local day `key`, newest first. */
+export function rowsOfDay(rows, key) {
+    return rows
+        .filter((row) => dayKey(row.startedAt) === key)
+        .sort((a, b) => b.startedAt - a.startedAt);
 }
 
 /** Month cursor for the calendar: month is 0-11. */
@@ -123,4 +142,48 @@ export function buildManualEntry({ date, start, stop, note }, nowMs) {
 /** Where the session started once the timer is hand-edited to `activeMs`, keeping pauses inside the range. */
 export function startedAtForElapsed(nowMs, activeMs, pausedMs) {
     return nowMs - activeMs - pausedMs;
+}
+
+// ----- Timer state -----
+// timer = { elapsedMs, startTime, pausedMs, isPaused, pauseStartedAt }: elapsedMs is the active time
+// banked before startTime; while running, now - startTime is added on top. pausedMs is the finished pauses,
+// pauseStartedAt marks the one in progress.
+
+/** Active time shown on the timer right now. */
+export function activeMsNow(timer, nowMs) {
+    return timer.isPaused ? timer.elapsedMs : timer.elapsedMs + nowMs - timer.startTime;
+}
+
+/** Paused time so far, including a pause still in progress. */
+export function pausedMsNow(timer, nowMs) {
+    return timer.pausedMs + (timer.isPaused ? nowMs - timer.pauseStartedAt : 0);
+}
+
+/**
+ * What sessionStorage keeps so a reload resumes the same session in the same state. The pause in progress
+ * is stored as its start, not folded into pausedMs, so a reload while paused stays paused.
+ */
+export function snapshotSession(session, timer, nowMs) {
+    return {
+        id: session.id,
+        startedAt: session.startedAt,
+        elapsedMs: activeMsNow(timer, nowMs),
+        pausedMs: timer.pausedMs,
+        isPaused: timer.isPaused,
+        pauseStartedAt: timer.isPaused ? timer.pauseStartedAt : null,
+    };
+}
+
+/** The session and timer fields to resume from a saved snapshot, or null when it is missing or unusable. */
+export function restoreSnapshot(saved) {
+    if (!saved || !saved.id || !Number.isFinite(saved.startedAt)) return null;
+    // A pause without a start time cannot be continued, so it resumes running instead.
+    const isPaused = saved.isPaused === true && Number.isFinite(saved.pauseStartedAt);
+    return {
+        session: { id: saved.id, startedAt: saved.startedAt },
+        elapsedMs: Number(saved.elapsedMs) || 0,
+        pausedMs: Number(saved.pausedMs) || 0,
+        isPaused,
+        pauseStartedAt: isPaused ? saved.pauseStartedAt : null,
+    };
 }

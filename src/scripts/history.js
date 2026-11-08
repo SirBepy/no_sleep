@@ -10,7 +10,8 @@ import {
     monthGrid,
     monthOf,
     monthRange,
-    sessionDurationMs,
+    rowsOfDay,
+    rowsTotalMs,
     shadeLevel,
     totalsByDay,
 } from './sessions.js';
@@ -45,10 +46,11 @@ function button(className, label, data) {
  * @param {() => object|null} deps.getStore  loaded Firebase store, or null while it is unavailable
  * @param {() => boolean} deps.isSignedIn
  * @param {() => Promise<boolean>} deps.signIn  runs Google sign-in; true once signed in
+ * @param {() => string|null} deps.getNotice  why sign-in is impossible right now (Firebase did not load), or null
  * @param {() => string|null} deps.getLiveId  id of the session this page is recording right now
  * @param {() => number} deps.getLiveElapsedMs  the running timer, so the Now row ticks between saves
  */
-export function createHistory({ getStore, isSignedIn, signIn, getLiveId, getLiveElapsedMs }) {
+export function createHistory({ getStore, isSignedIn, signIn, getNotice, getLiveId, getLiveElapsedMs }) {
     const dialog = $('history-dialog');
     const body = $('history-body');
     const entryDialog = $('entry-dialog');
@@ -66,6 +68,9 @@ export function createHistory({ getStore, isSignedIn, signIn, getLiveId, getLive
     let liveTicker = null;
 
     // ----- Rendering -----
+
+    /** The running session as the totals helpers want it: its id and value right now. */
+    const live = () => ({ id: getLiveId(), ms: getLiveElapsedMs() });
 
     function renderEntry(row) {
         const isLive = row.id === getLiveId();
@@ -85,7 +90,7 @@ export function createHistory({ getStore, isSignedIn, signIn, getLiveId, getLive
         if (isLive) item.append(el('span', 'badge badge-success badge-sm', 'Now'));
         else if (row.manual) item.append(el('span', 'badge badge-info badge-sm', 'manual'));
 
-        const duration = el('span', 'entry-duration', formatDuration(isLive ? getLiveElapsedMs() : sessionDurationMs(row)));
+        const duration = el('span', 'entry-duration', formatDuration(isLive ? getLiveElapsedMs() : rowsTotalMs([row])));
         if (isLive) duration.dataset.liveDuration = '1';
         item.append(duration);
 
@@ -106,13 +111,15 @@ export function createHistory({ getStore, isSignedIn, signIn, getLiveId, getLive
 
     function dayHead(label, ms) {
         const head = el('div', 'day-head');
-        head.append(el('span', '', label), el('b', '', formatDuration(ms)));
+        const total = el('b', '', formatDuration(ms));
+        total.dataset.dayTotal = '1';
+        head.append(el('span', '', label), total);
         return head;
     }
 
-    function errorBox(message) {
+    function errorBox(message, retryData = { retry: '1' }) {
         const box = el('div', 'history-error');
-        box.append(el('span', '', message), button('btn btn-ghost btn-sm', 'Retry', { retry: '1' }));
+        box.append(el('span', '', message), button('btn btn-ghost btn-sm', 'Retry', retryData));
         return box;
     }
 
@@ -122,16 +129,15 @@ export function createHistory({ getStore, isSignedIn, signIn, getLiveId, getLive
         return wrap;
     }
 
-    /** The running session counts at its live value, not the last saved heartbeat. */
-    function dayTotal(rows) {
-        const liveId = getLiveId();
-        return rows.reduce((sum, r) => sum + (r.id === liveId ? getLiveElapsedMs() : sessionDurationMs(r)), 0);
+    function monthTotalText(totals) {
+        const monthTotal = [...totals.values()].reduce((a, b) => a + b, 0);
+        return monthTotal ? `${formatDuration(monthTotal)} this month` : 'Nothing tracked this month';
     }
 
-    function rowsOfDay(key) {
-        return state.monthRows
-            .filter((r) => dayKey(r.startedAt) === key)
-            .sort((a, b) => b.startedAt - a.startedAt);
+    function dayAriaLabel(key, ms) {
+        const [y, m, d] = key.split('-').map(Number);
+        const spoken = new Date(y, m - 1, d).toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
+        return ms ? `${spoken}, ${formatDuration(ms)} tracked` : spoken;
     }
 
     function calendarSection(now) {
@@ -161,11 +167,9 @@ export function createHistory({ getStore, isSignedIn, signIn, getLiveId, getLive
             return section;
         }
 
-        const totals = totalsByDay(state.monthRows);
-        if (isCurrentMonth) totals.set(today, dayTotal(rowsOfDay(today)));
-        const monthTotal = [...totals.values()].reduce((a, b) => a + b, 0);
+        const totals = totalsByDay(state.monthRows, live());
         const busiest = Math.max(0, ...totals.values());
-        head.after(el('div', 'cal-total', monthTotal ? `${formatDuration(monthTotal)} this month` : 'Nothing tracked this month'));
+        head.after(el('div', 'cal-total', monthTotalText(totals)));
 
         const grid = el('div', 'cal-grid');
         for (let i = 0; i < 7; i++) {
@@ -178,7 +182,7 @@ export function createHistory({ getStore, isSignedIn, signIn, getLiveId, getLive
                 continue;
             }
             const ms = totals.get(key) || 0;
-            const [y, m, d] = key.split('-').map(Number);
+            const d = Number(key.slice(-2));
             const cell = button('cal-day', '', { day: key });
             const future = key > today;
             cell.disabled = future;
@@ -186,8 +190,7 @@ export function createHistory({ getStore, isSignedIn, signIn, getLiveId, getLive
             if (key === state.selected) cell.classList.add('is-selected');
             if (ms) cell.style.setProperty('--shade', String(shadeLevel(ms, busiest)));
             cell.append(el('span', 'cal-num', String(d)), el('span', 'cal-hours', ms ? formatDuration(ms) : ''));
-            const spoken = new Date(y, m - 1, d).toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
-            cell.setAttribute('aria-label', ms ? `${spoken}, ${formatDuration(ms)} tracked` : spoken);
+            cell.setAttribute('aria-label', dayAriaLabel(key, ms));
             if (key === state.selected) cell.setAttribute('aria-pressed', 'true');
             grid.append(cell);
         }
@@ -202,9 +205,9 @@ export function createHistory({ getStore, isSignedIn, signIn, getLiveId, getLive
             detail.append(el('p', 'history-hint', 'Pick a day to see its exact hours.'));
             return detail;
         }
-        const rows = rowsOfDay(state.selected);
+        const rows = rowsOfDay(state.monthRows, state.selected);
         const day = el('div', 'day');
-        day.append(dayHead(dayLabel(state.selected, now), dayTotal(rows)));
+        day.append(dayHead(dayLabel(state.selected, now), rowsTotalMs(rows, live())));
         const list = el('div', 'day-list');
         list.dataset.day = state.selected;
         for (const row of rows) list.append(renderEntry(row));
@@ -235,6 +238,8 @@ export function createHistory({ getStore, isSignedIn, signIn, getLiveId, getLive
             const prompt = el('div', 'history-signin');
             prompt.append(el('p', '', 'Sign in with Google to see your history. Your sessions are saved to your account, so clearing the browser never loses them.'));
             prompt.append(button('btn btn-primary btn-sm', 'Sign in with Google', { signin: '1' }));
+            const notice = getNotice();
+            if (notice) prompt.append(errorBox(notice, { signin: '1' }));
             body.append(prompt);
             return;
         }
@@ -251,9 +256,22 @@ export function createHistory({ getStore, isSignedIn, signIn, getLiveId, getLive
         if (focusedDay) body.querySelector(`[data-day="${focusedDay}"]`)?.focus();
     }
 
+    // Once a second: the Now row, the open day's total, and the calendar's cells and month total, so none of
+    // them wait for the next 30 s heartbeat snapshot to catch up with the running timer.
     function tickLive() {
-        const node = body.querySelector('[data-live-duration]');
-        if (node) node.textContent = formatDuration(getLiveElapsedMs());
+        const nowRow = body.querySelector('[data-live-duration]');
+        if (nowRow) nowRow.textContent = formatDuration(getLiveElapsedMs());
+        if (state.monthStatus !== 'ready' || !isSignedIn()) return;
+        const dayTotal = body.querySelector('[data-day-total]');
+        if (dayTotal) dayTotal.textContent = formatDuration(rowsTotalMs(rowsOfDay(state.monthRows, state.selected), live()));
+        const totals = totalsByDay(state.monthRows, live());
+        for (const cell of body.querySelectorAll('.cal-day')) {
+            const ms = totals.get(cell.dataset.day) || 0;
+            cell.querySelector('.cal-hours').textContent = ms ? formatDuration(ms) : '';
+            cell.setAttribute('aria-label', dayAriaLabel(cell.dataset.day, ms));
+        }
+        const monthTotal = body.querySelector('.cal-total');
+        if (monthTotal) monthTotal.textContent = monthTotalText(totals);
     }
 
     // ----- Data -----
@@ -358,6 +376,8 @@ export function createHistory({ getStore, isSignedIn, signIn, getLiveId, getLive
             startWatching();
         } else if (data.signin) {
             await signIn();
+            // Signing in re-renders through the auth listener; a failed attempt needs this to show its notice.
+            if (!isSignedIn()) render();
         } else if (data.monthStep) {
             state.month = addMonths(state.month, Number(data.monthStep));
             // Landing back on the current month selects today again, like opening the dialog does.
