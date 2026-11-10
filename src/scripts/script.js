@@ -336,7 +336,9 @@ async function connectStore() {
 
 async function importStore() {
     try {
-        // A module that failed to load stays failed for its URL, so a retry asks for a fresh one.
+        // Chrome 157 and Firefox 156 re-fetch a module that failed once, even for the same URL, so the retry
+        // recovers once the CDN is back (measured 2026-11-10 with gstatic blocked, then unblocked). The
+        // ?retry=N URL is insurance for an engine that keeps the failed record per URL (Safari: not measured).
         store = await import(storeAttempts === 0 ? './store.js' : `./store.js?retry=${storeAttempts}`);
     } catch (err) {
         storeAttempts += 1;
