@@ -24,6 +24,7 @@ import {
     snapshotSession,
     restoreSnapshot,
     pickResumable,
+    RESUME_IDLE_MS,
 } from '../src/scripts/sessions.js';
 
 const at = (y, mo, d, h = 0, mi = 0) => new Date(y, mo - 1, d, h, mi).getTime();
@@ -201,11 +202,21 @@ test('pickResumable takes the timer recording that was counted last and never a 
         { id: 'typed-in', startedAt: at(2026, 11, 5, 14), endedAt: at(2026, 11, 5, 15), activeMs: 3600000, manual: true },
         { id: 'no-end', startedAt: at(2026, 11, 5, 9) },
     ];
-    assert.equal(pickResumable(rows).id, 'afternoon');
-    assert.equal(pickResumable([rows[2]]), null);
-    assert.equal(pickResumable([]), null);
+    const evening = at(2026, 11, 5, 20);
+    assert.equal(pickResumable(rows, evening).id, 'afternoon');
+    assert.equal(pickResumable([rows[2]], evening), null);
+    assert.equal(pickResumable([], evening), null);
     // A row with no endedAt ranks by its start.
-    assert.equal(pickResumable([rows[3], { id: 'earlier', startedAt: at(2026, 11, 5, 7) }]).id, 'no-end');
+    assert.equal(pickResumable([rows[3], { id: 'earlier', startedAt: at(2026, 11, 5, 7) }], evening).id, 'no-end');
+});
+
+test('pickResumable leaves a row another page is still saving, and takes it once it has gone quiet', () => {
+    const live = { id: 'live', startedAt: at(2026, 11, 5, 12), endedAt: at(2026, 11, 5, 14, 0) };
+    const older = { id: 'older', startedAt: at(2026, 11, 5, 8), endedAt: at(2026, 11, 5, 10) };
+    const justAfter = (ms) => live.endedAt + ms;
+    assert.equal(pickResumable([live, older], justAfter(30000)).id, 'older');
+    assert.equal(pickResumable([live], justAfter(RESUME_IDLE_MS - 1)), null);
+    assert.equal(pickResumable([live, older], justAfter(RESUME_IDLE_MS)).id, 'live');
 });
 
 test('startedAtForElapsed keeps paused time inside the session range', () => {

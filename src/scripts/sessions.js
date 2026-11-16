@@ -139,15 +139,21 @@ export function buildManualEntry({ date, start, stop, note }, nowMs) {
     };
 }
 
+// A page saves every 30 s, and a hidden tab's timers can be throttled to once a minute. A row saved more
+// recently than this still belongs to a page that is running, so a second page must not adopt it.
+export const RESUME_IDLE_MS = 120000;
+
 /**
  * The saved row a fresh page should pick back up: the one counted last among rows that were recorded
- * by the timer. Manual entries are skipped because resuming one would turn it into a timer recording.
+ * by the timer and are no longer being written by another page. Manual entries are skipped because
+ * resuming one would turn it into a timer recording.
  */
-export function pickResumable(rows) {
+export function pickResumable(rows, nowMs) {
     let best = null;
     for (const row of rows) {
         if (row.manual === true || !Number.isFinite(row.startedAt)) continue;
         const endedAt = Number.isFinite(row.endedAt) ? row.endedAt : row.startedAt;
+        if (nowMs - endedAt < RESUME_IDLE_MS) continue;
         if (!best || endedAt > best.endedAt) best = { row, endedAt };
     }
     return best ? best.row : null;

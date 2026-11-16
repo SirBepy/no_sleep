@@ -34,6 +34,9 @@ let session = null;
 let resumable = false;
 // While today's saved recording is being looked up, saving is held back so the fresh session is not written as a second row.
 let resuming = false;
+// Uid of the account whose saved recording this page took over; null while the page's session is its own.
+let resumedFor = null;
+const RESUME_LOOKUP_TIMEOUT_MS = 5000;
 // Firebase store module (null until it imports, and again after a failed import until a retry works) and the signed-in user (null while signed out).
 let store = null;
 let user = null;
@@ -150,21 +153,28 @@ function restoreSession() {
     resumable = true;
 }
 
+// A lookup that never settles (a stalled connection) must not hold saving back for good.
+function withTimeout(promise, ms) {
+    return Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error('timed out')), ms))]);
+}
+
 // Signed-in, fresh page: carry on today's last recording instead of starting again at 0. The seconds this
 // page has already run stay counted on top of it.
 async function resumeToday() {
     if (!resumable || resuming) return;
     resuming = true;
+    const uid = user.uid;
     try {
         const now = new Date();
         const since = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
         const until = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime();
-        const row = pickResumable(await store.getSessions({ since, until }));
-        // The timer may have been edited or paused while the lookup ran.
-        if (!row || !resumable) return;
+        const row = pickResumable(await withTimeout(store.getSessions({ since, until }), RESUME_LOOKUP_TIMEOUT_MS), Date.now());
+        // The timer may have been edited or paused while the lookup ran, or the account may have changed.
+        if (!row || !resumable || !user || user.uid !== uid) return;
         session = { id: row.id, startedAt: row.startedAt };
         elapsedMs = Number(row.activeMs) || 0;
         pausedMs = Number(row.pausedMs) || 0;
+        resumedFor = uid;
         renderTimer();
         history.refresh();
     } catch (err) {
@@ -173,6 +183,23 @@ async function resumeToday() {
         resumable = false;
         resuming = false;
     }
+}
+
+// The resumed recording belongs to one account. After a sign-out or a switch to another account the page
+// starts over at 0, so the first account's hours and doc id never get written under the second one.
+function dropResumedSession() {
+    if (!resumedFor || (user && user.uid === resumedFor)) return;
+    resumedFor = null;
+    clearInterval(runningTimer);
+    session = { id: crypto.randomUUID(), startedAt: Date.now() };
+    elapsedMs = 0;
+    pausedMs = 0;
+    isPaused = false;
+    pauseStartedAt = null;
+    startTime = Date.now();
+    resumable = true;
+    showPauseState();
+    updateTimer();
 }
 
 // Fire-and-forget: the cache queues the write offline, and a failure only reaches the console.
@@ -383,6 +410,7 @@ async function importStore() {
         user = nextUser;
         renderAccount();
         console.log(user ? `Signed in as ${user.email}` : 'Signed out');
+        dropResumedSession();
         history.refresh();
         if (user) resumeToday().then(saveSessionNow);
         else saveSessionNow();
