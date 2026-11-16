@@ -16,6 +16,7 @@ import {
     doc,
     setDoc,
     deleteDoc,
+    getDocs,
     query,
     where,
     orderBy,
@@ -52,18 +53,24 @@ export function deleteSession(id) {
     return deleteDoc(doc(sessionsCol(), id));
 }
 
+function rangeQuery({ since, until }) {
+    const bounds = [where('startedAt', '>=', since)];
+    if (until !== undefined) bounds.push(where('startedAt', '<', until));
+    return query(sessionsCol(), ...bounds, orderBy('startedAt', 'desc'));
+}
+
+const toRows = (snapshot) => snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+/** One-time read of the same range as watchSessions. getDocs asks the server and only falls back to the cache offline. */
+export async function getSessions(range) {
+    return toRows(await getDocs(rangeQuery(range)));
+}
+
 /**
  * Live list of sessions that started in [since, until) (until optional), newest first. Returns the
  * unsubscribe function. Both bounds are on startedAt, the same field as the sort, so no composite
  * index is needed.
  */
 export function watchSessions({ since, until }, onRows, onError) {
-    const bounds = [where('startedAt', '>=', since)];
-    if (until !== undefined) bounds.push(where('startedAt', '<', until));
-    const q = query(sessionsCol(), ...bounds, orderBy('startedAt', 'desc'));
-    return onSnapshot(
-        q,
-        (snapshot) => onRows(snapshot.docs.map((d) => ({ id: d.id, ...d.data() }))),
-        onError,
-    );
+    return onSnapshot(rangeQuery({ since, until }), (snapshot) => onRows(toRows(snapshot)), onError);
 }

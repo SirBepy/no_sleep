@@ -139,6 +139,20 @@ export function buildManualEntry({ date, start, stop, note }, nowMs) {
     };
 }
 
+/**
+ * The saved row a fresh page should pick back up: the one counted last among rows that were recorded
+ * by the timer. Manual entries are skipped because resuming one would turn it into a timer recording.
+ */
+export function pickResumable(rows) {
+    let best = null;
+    for (const row of rows) {
+        if (row.manual === true || !Number.isFinite(row.startedAt)) continue;
+        const endedAt = Number.isFinite(row.endedAt) ? row.endedAt : row.startedAt;
+        if (!best || endedAt > best.endedAt) best = { row, endedAt };
+    }
+    return best ? best.row : null;
+}
+
 /** Where the session started once the timer is hand-edited to `activeMs`, keeping pauses inside the range. */
 export function startedAtForElapsed(nowMs, activeMs, pausedMs) {
     return nowMs - activeMs - pausedMs;

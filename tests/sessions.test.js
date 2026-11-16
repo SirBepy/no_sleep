@@ -23,6 +23,7 @@ import {
     pausedMsNow,
     snapshotSession,
     restoreSnapshot,
+    pickResumable,
 } from '../src/scripts/sessions.js';
 
 const at = (y, mo, d, h = 0, mi = 0) => new Date(y, mo - 1, d, h, mi).getTime();
@@ -191,6 +192,20 @@ test('restoreSnapshot rejects unusable data and degrades a pause with no start t
     assert.equal(odd.isPaused, false);
     assert.equal(odd.elapsedMs, 0);
     assert.equal(odd.pausedMs, 0);
+});
+
+test('pickResumable takes the timer recording that was counted last and never a manual entry', () => {
+    const rows = [
+        { id: 'morning', startedAt: at(2026, 11, 5, 8), endedAt: at(2026, 11, 5, 10), activeMs: 7200000 },
+        { id: 'afternoon', startedAt: at(2026, 11, 5, 12), endedAt: at(2026, 11, 5, 14), activeMs: 7200000 },
+        { id: 'typed-in', startedAt: at(2026, 11, 5, 14), endedAt: at(2026, 11, 5, 15), activeMs: 3600000, manual: true },
+        { id: 'no-end', startedAt: at(2026, 11, 5, 9) },
+    ];
+    assert.equal(pickResumable(rows).id, 'afternoon');
+    assert.equal(pickResumable([rows[2]]), null);
+    assert.equal(pickResumable([]), null);
+    // A row with no endedAt ranks by its start.
+    assert.equal(pickResumable([rows[3], { id: 'earlier', startedAt: at(2026, 11, 5, 7) }]).id, 'no-end');
 });
 
 test('startedAtForElapsed keeps paused time inside the session range', () => {

@@ -2,6 +2,7 @@ import {
     activeMsNow,
     pad2,
     pausedMsNow,
+    pickResumable,
     replaceUnit,
     restoreSnapshot,
     snapshotSession,
@@ -28,6 +29,11 @@ let audioCtx = null;
 let silentOscillator = null;
 // Current recording: id names the Firestore doc, startedAt is the wall-clock start.
 let session = null;
+// True while this page's session is brand new and untouched, so a recording saved earlier today (before a
+// PC reset or a closed browser wiped sessionStorage) can still replace it. Editing or pausing the timer ends it.
+let resumable = false;
+// While today's saved recording is being looked up, saving is held back so the fresh session is not written as a second row.
+let resuming = false;
 // Firebase store module (null until it imports, and again after a failed import until a retry works) and the signed-in user (null while signed out).
 let store = null;
 let user = null;
@@ -141,11 +147,37 @@ function restoreSession() {
         console.warn('Ignoring unreadable saved session:', err);
     }
     session = { id: crypto.randomUUID(), startedAt: Date.now() };
+    resumable = true;
+}
+
+// Signed-in, fresh page: carry on today's last recording instead of starting again at 0. The seconds this
+// page has already run stay counted on top of it.
+async function resumeToday() {
+    if (!resumable || resuming) return;
+    resuming = true;
+    try {
+        const now = new Date();
+        const since = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        const until = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime();
+        const row = pickResumable(await store.getSessions({ since, until }));
+        // The timer may have been edited or paused while the lookup ran.
+        if (!row || !resumable) return;
+        session = { id: row.id, startedAt: row.startedAt };
+        elapsedMs = Number(row.activeMs) || 0;
+        pausedMs = Number(row.pausedMs) || 0;
+        renderTimer();
+        history.refresh();
+    } catch (err) {
+        console.warn('Could not look up today\'s saved time:', err);
+    } finally {
+        resumable = false;
+        resuming = false;
+    }
 }
 
 // Fire-and-forget: the cache queues the write offline, and a failure only reaches the console.
 function saveSessionNow() {
-    if (!store || !user || !session) return;
+    if (!store || !user || !session || resuming) return;
     store.saveSession(session.id, {
         startedAt: session.startedAt,
         endedAt: Date.now(),
@@ -174,6 +206,7 @@ function updateTimer() {
 }
 
 function setElapsed(ms) {
+    resumable = false;
     elapsedMs = ms;
     startTime = Date.now();
     session.startedAt = startedAtForElapsed(Date.now(), ms, currentPausedMs());
@@ -262,6 +295,7 @@ function togglePause() {
     if (!document.getElementById('pause-toggle')) return;
 
     isPaused = !isPaused;
+    resumable = false;
 
     if (isPaused) {
         elapsedMs += Date.now() - startTime;
@@ -349,8 +383,9 @@ async function importStore() {
         user = nextUser;
         renderAccount();
         console.log(user ? `Signed in as ${user.email}` : 'Signed out');
-        saveSessionNow();
         history.refresh();
+        if (user) resumeToday().then(saveSessionNow);
+        else saveSessionNow();
     });
     setInterval(saveSessionNow, SAVE_INTERVAL_MS);
     return true;
