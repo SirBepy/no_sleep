@@ -14,6 +14,7 @@ import { createHistory } from './history.js';
 
 const SAVE_INTERVAL_MS = 30000;
 const SESSION_KEY = 'nosleep_session';
+const RESUMED_FOR_KEY = 'nosleep_resumed_for';
 
 let wakeInterval = 30000;
 let wakeTimer;
@@ -144,6 +145,8 @@ function restoreSession() {
             pausedMs = restored.pausedMs;
             isPaused = restored.isPaused;
             pauseStartedAt = restored.pauseStartedAt;
+            // A reload keeps a resumed recording tied to its account, so a later switch still starts over.
+            resumedFor = sessionStorage.getItem(RESUMED_FOR_KEY);
             return;
         }
     } catch (err) {
@@ -175,6 +178,7 @@ async function resumeToday() {
         elapsedMs = Number(row.activeMs) || 0;
         pausedMs = Number(row.pausedMs) || 0;
         resumedFor = uid;
+        sessionStorage.setItem(RESUMED_FOR_KEY, uid);
         renderTimer();
         history.refresh();
     } catch (err) {
@@ -190,6 +194,7 @@ async function resumeToday() {
 function dropResumedSession() {
     if (!resumedFor || (user && user.uid === resumedFor)) return;
     resumedFor = null;
+    sessionStorage.removeItem(RESUMED_FOR_KEY);
     clearInterval(runningTimer);
     session = { id: crypto.randomUUID(), startedAt: Date.now() };
     elapsedMs = 0;
